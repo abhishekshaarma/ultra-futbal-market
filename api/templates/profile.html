@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<a href="/logout" class="nes-btn is-error float-end" style="float:right;">Logout</a>
+<h1 class="nes-text is-primary">Welcome, {{ user.username or user.email }}</h1>
+{% if errors and errors|length > 0 %}
+<div class="nes-container is-rounded is-dark" style="background:#ffeded;color:#a00;">
+    <ul>
+    {% for error in errors %}
+        <li>{{ error }}</li>
+    {% endfor %}
+    </ul>
+</div>
+{% endif %}
+<div class="row" style="display:flex; flex-wrap:wrap; gap:2em;">
+    <div style="flex:1; min-width:260px;">
+        <div class="nes-container with-title is-centered is-rounded">
+            <p class="title" style="background-color: #333333">Profile</p>
+            <ul style="list-style:none; padding-left:0;">
+                <li><strong>Username:</strong> {{ user.username }}</li>
+                <li><strong>Email:</strong> {{ user.email }}</li>
+            </ul>
+        </div>
+    </div>
+    <div style="flex:1; min-width:260px;">
+        <div class="nes-container with-title is-centered is-rounded">
+            <p class="title" style="background-color: #333333">Balance</p>
+            <img src="{{ url_for('static', filename='dollar.png') }}" alt="Welcome GIF" style="max-width: 10%;">
+            <p><strong>Current Balance:</strong> ${{ balance }}</p>
+        </div>
+    </div>
+    <div style="flex:1; min-width:260px;">
+        <div class="nes-container with-title is-centered is-rounded">
+            <p class="title" style="background-color: #333333">Recent Positions</p>
+            {% if positions %}
+            <table class="nes-table is-bordered is-centered">
+                <tr><th>Market</th><th>YES Shares</th><th>NO Shares</th><th>Realized PnL</th></tr>
+                {% for pos in positions %}
+                <tr>
+                    <td>{{ pos.market_id }}</td>
+                    <td>{{ pos.yes_shares }}</td>
+                    <td>{{ pos.no_shares }}</td>
+                    <td>{{ pos.realized_pnl }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% else %}<p>No positions.</p>{% endif %}
+        </div>
+    </div>
+</div>
+<div class="row" style="display:flex; flex-wrap:wrap; gap:2em; margin-top:2em;">
+    <div style="flex:1; min-width:320px;">
+        <div class="nes-container with-title is-centered is-rounded">
+            <p class="title" style="background-color: #333333">Notifications</p>
+            {% if notifications %}
+            <ul>
+                {% for n in notifications %}
+                <li><strong>{{ n.type|capitalize }}:</strong> {{ n.message }} <em>({{ n.created_at }})</em></li>
+                {% endfor %}
+            </ul>
+            {% else %}<p>No notifications.</p>{% endif %}
+        </div>
+    </div>
+    <div style="flex:1; min-width:320px;">
+        <div class="nes-container with-title is-centered is-rounded">
+            <p class="title" style="background-color: #333333">Recent Transactions</p>
+            {% if transactions %}
+            <table class="nes-table is-bordered is-centered">
+                <tr><th>Amount</th><th>Type</th><th>Description</th><th>Date</th></tr>
+                {% for t in transactions %}
+                <tr>
+                    <td>{{ t.amount }}</td>
+                    <td>{{ t.type }}</td>
+                    <td>{{ t.description }}</td>
+                    <td>{{ t.created_at }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% else %}<p>No transactions.</p>{% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 
