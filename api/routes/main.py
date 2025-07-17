@@ -3,10 +3,4 @@ from flask import Blueprint, render_template
 
 main_bp = Blueprint('main', __name__)
 
-@main_bp.route('/')
-def home():
-    return render_template('index.html')
-
-@main_bp.route('/about')
-def about():
-    return render_template('about.html') 
+# Remove the '/' and '/about' routes, as they are now in user.py 

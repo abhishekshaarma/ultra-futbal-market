@@ -14,6 +14,14 @@ def get_user_dict(user_obj):
 
 user_bp = Blueprint('user', __name__)
 
+@user_bp.route('/')
+def home():
+    return render_template('index.html')
+
+@user_bp.route('/about')
+def about():
+    return render_template('about.html')
+
 @user_bp.route('/profile')
 @login_required
 def profile():
