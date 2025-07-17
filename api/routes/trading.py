@@ -1,10 +1,20 @@
 from flask import Blueprint, request, jsonify, g, current_app as app
 from api.auth import login_required
 from api.utils import get_or_create_orderbook, bootstrap_market, ORDERBOOK_AVAILABLE, match_orders_database_only
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 trading_bp = Blueprint('trading', __name__)
+
+def get_current_user_id():
+    """Helper function to extract user ID from g.current_user"""
+    current_user = g.current_user
+    if hasattr(current_user, 'id'):
+        return current_user.id
+    elif isinstance(current_user, dict):
+        return current_user['id']
+    else:
+        return str(current_user)
 
 @trading_bp.route('/api/markets/<market_id>/orders', methods=['POST'])
 @login_required
@@ -12,6 +22,8 @@ def place_order(market_id):
     """Place a trading order on a market - serverless compatible"""
     try:
         data = request.get_json()
+        print(f"DEBUG: Received data: {data}")
+        print(f"DEBUG: Market ID: {market_id}")
         
         # Validate required fields
         required_fields = ['side', 'token', 'price', 'size']
@@ -20,8 +32,8 @@ def place_order(market_id):
                 return jsonify({'error': f'Missing required field: {field}'}), 400
         
         # Validate field values
-        side = data['side'].lower()
-        token = data['token'].upper()
+        side = data['side'].lower()  # buy/sell direction
+        token = data['token'].upper()  # YES/NO token type
         
         if side not in ['buy', 'sell']:
             return jsonify({'error': 'Side must be buy or sell'}), 400
@@ -43,130 +55,111 @@ def place_order(market_id):
         if size <= 0:
             return jsonify({'error': 'Size must be positive'}), 400
         
-        # Check if market exists and is active
         supabase = app.supabase
-        market_resp = supabase.table('markets').select('*').eq('id', market_id).single().execute()
-        if not market_resp.data:
-            return jsonify({'error': 'Market not found'}), 404
         
-        market = market_resp.data
+        # Check if market exists and is active - ADD DEBUG
+        print(f"DEBUG: Looking up market {market_id}")
+        try:
+            market_resp = supabase.table('markets').select('*').eq('id', market_id).single().execute()
+            print(f"DEBUG: Market response: {market_resp}")
+            
+            if not market_resp.data:
+                return jsonify({'error': 'Market not found'}), 404
+            
+            market = market_resp.data
+            print(f"DEBUG: Found market: {market['title']}, status: {market['status']}")
+            
+        except Exception as e:
+            print(f"DEBUG: Market lookup failed: {e}")
+            return jsonify({'error': f'Market lookup failed: {str(e)}'}), 500
+        
         if market['status'] != 'active':
             return jsonify({'error': 'Market is not active for trading'}), 400
         
         # Check if market has ended
         end_date = datetime.fromisoformat(market['end_date'].replace('Z', '+00:00'))
-        if datetime.now() >= end_date:
+        if datetime.now(timezone.utc) >= end_date:
             return jsonify({'error': 'Market has ended for trading'}), 400
         
-        # Get user info
-        user_id = g.current_user['id']
+        # Get user info - ADD DEBUG
+        user_id = get_current_user_id()
+        print(f"DEBUG: Current user ID: {user_id}")
         
-        # Check user balance for buy orders
+        # Check user balance for buy orders - ADD DEBUG
         if side == 'buy':
             cost = price * size if token == 'YES' else (1 - price) * size
+            print(f"DEBUG: Buy order cost: {cost}")
             
-            user_resp = supabase.table('users').select('balance').eq('id', user_id).single().execute()
-            if not user_resp.data:
-                return jsonify({'error': 'User not found'}), 404
-            
-            user_balance = float(user_resp.data['balance'])
-            if user_balance < cost:
-                return jsonify({'error': 'Insufficient balance'}), 400
-        
-        # For sell orders, check if user has enough shares
-        if side == 'sell':
-            position_resp = supabase.table('positions').select('*').eq('user_id', user_id).eq('market_id', market_id).single().execute()
-            
-            if position_resp.data:
-                position = position_resp.data
-                if token == 'YES':
-                    available_shares = float(position.get('yes_shares', 0))
-                else:
-                    available_shares = float(position.get('no_shares', 0))
+            try:
+                user_resp = supabase.table('users').select('balance').eq('id', user_id).single().execute()
+                print(f"DEBUG: User balance response: {user_resp}")
                 
-                if available_shares < size:
-                    return jsonify({'error': f'Insufficient {token} shares. You have {available_shares}'}), 400
-            else:
-                return jsonify({'error': f'No {token} shares to sell'}), 400
+                if not user_resp.data:
+                    return jsonify({'error': 'User not found'}), 404
+                
+                user_balance = float(user_resp.data['balance'])
+                print(f"DEBUG: User balance: {user_balance}")
+                
+                if user_balance < cost:
+                    return jsonify({'error': 'Insufficient balance'}), 400
+                    
+            except Exception as e:
+                print(f"DEBUG: User balance lookup failed: {e}")
+                return jsonify({'error': f'User balance lookup failed: {str(e)}'}), 500
+        
+        # For sell orders, check if user has enough shares - ADD DEBUG
+        if side == 'sell':
+            print(f"DEBUG: Checking sell order for {token} shares")
+            try:
+                # Use execute() without single() first to see if position exists
+                position_resp = supabase.table('positions').select('*').eq('user_id', user_id).eq('market_id', market_id).execute()
+                print(f"DEBUG: Position response: {position_resp}")
+                
+                if position_resp.data and len(position_resp.data) > 0:
+                    position = position_resp.data[0]  # Get first position
+                    if token == 'YES':
+                        available_shares = float(position.get('yes_shares', 0))
+                    else:
+                        available_shares = float(position.get('no_shares', 0))
+                    
+                    print(f"DEBUG: Available {token} shares: {available_shares}")
+                    
+                    if available_shares < size:
+                        return jsonify({'error': f'Insufficient {token} shares. You have {available_shares}'}), 400
+                else:
+                    print(f"DEBUG: No position found for user {user_id} in market {market_id}")
+                    return jsonify({'error': f'No {token} shares to sell'}), 400
+                    
+            except Exception as e:
+                print(f"DEBUG: Position lookup failed: {e}")
+                return jsonify({'error': f'Position lookup failed: {str(e)}'}), 500
         
         # Generate order ID
         order_id = str(uuid.uuid4())
+        print(f"DEBUG: Generated order ID: {order_id}")
         
         # Create order object for matching
+        db_side = token.upper()  # 'YES' or 'NO' goes to side column
+        db_token = side.upper()  # 'BUY' or 'SELL' goes to token column
+        
         new_order = {
             'id': order_id,
             'market_id': market_id,
             'user_id': user_id,
-            'side': side,
-            'token': token,
+            'side': db_side,      # 'YES' or 'NO' (token type)
+            'token': db_token,    # 'BUY' or 'SELL' (direction)
             'price': price,
             'size': size,
             'filled': 0,
             'status': 'open',
-            'created_at': datetime.utcnow().isoformat()
+            'created_at': datetime.now(timezone.utc).isoformat()
         }
         
-        # Try C++ orderbook first, fallback to database matching
+        print(f"DEBUG: Order to insert: {new_order}")
+        
+        # Skip C++ orderbook for now to simplify debugging
         matches = []
         filled_amount = 0
-        
-        if ORDERBOOK_AVAILABLE:
-            try:
-                orderbook = get_or_create_orderbook(market_id)
-                if orderbook:
-                    import orderbook_cpp as ob
-                    
-                    order_type = ob.OrderType.GoodTillCancel
-                    ob_side = ob.Side.Buy if side == 'buy' else ob.Side.Sell
-                    ob_token = ob.Token.YES if token == 'YES' else ob.Token.NO
-                    price_cents = int(price * 100)
-                    
-                    cpp_matches = orderbook.add_order(order_type, ob_side, price_cents, int(size), user_id, ob_token)
-                    
-                    if cpp_matches:
-                        for match in cpp_matches:
-                            filled_amount += match.size
-                            matches.append({
-                                'size': match.size,
-                                'price': match.price / 100.0,
-                                'maker_user_id': match.maker_user_id
-                            })
-            except Exception as e:
-                print(f"C++ orderbook failed, using database matching: {e}")
-        
-        # If C++ orderbook not available or failed, use database matching
-        if not matches and not ORDERBOOK_AVAILABLE:
-            db_matches, remaining_size = match_orders_database_only(market_id, new_order, supabase)
-            filled_amount = size - remaining_size
-            matches = db_matches
-        
-        # Process trades
-        trades = []
-        for match in matches:
-            trade_data = {
-                'market_id': market_id,
-                'price': match['price'],
-                'size': match['size'],
-                'buyer_order_id': order_id if side == 'buy' else match.get('maker_order_id', str(uuid.uuid4())),
-                'seller_order_id': order_id if side == 'sell' else match.get('maker_order_id', str(uuid.uuid4())),
-                'buyer_id': user_id if side == 'buy' else match['maker_user_id'],
-                'seller_id': user_id if side == 'sell' else match['maker_user_id'],
-                'token': token,
-                'created_at': datetime.utcnow().isoformat()
-            }
-            
-            # Record trade in database
-            trade_resp = supabase.table('trades').insert(trade_data).execute()
-            
-            if trade_resp.data:
-                trades.append(trade_resp.data[0])
-            
-            # Update positions for both users
-            update_user_position(user_id, market_id, token, side, match['size'], match['price'], supabase)
-            update_user_position(match['maker_user_id'], market_id, token, 'sell' if side == 'buy' else 'buy', match['size'], match['price'], supabase)
-            
-            # Update user balances
-            update_user_balances(user_id, match['maker_user_id'], side, match['size'], match['price'], token, supabase)
         
         # Update order with filled amount
         new_order['filled'] = filled_amount
@@ -174,17 +167,24 @@ def place_order(market_id):
         
         if remaining_size <= 0:
             new_order['status'] = 'filled'
-            new_order['filled_at'] = datetime.utcnow().isoformat()
+            new_order['filled_at'] = datetime.now(timezone.utc).isoformat()
         
         # Insert order into database
-        order_resp = supabase.table('orders').insert(new_order).execute()
-        
-        if not order_resp.data:
-            return jsonify({'error': 'Failed to record order'}), 500
+        try:
+            print(f"DEBUG: Inserting order into database...")
+            order_resp = supabase.table('orders').insert(new_order).execute()
+            print(f"DEBUG: Order insert response: {order_resp}")
+            
+            if not order_resp.data:
+                return jsonify({'error': 'Failed to record order'}), 500
+        except Exception as e:
+            print(f"DEBUG: Database insert failed: {e}")
+            return jsonify({'error': f'Database insert failed: {str(e)}'}), 500
         
         # Deduct cost from user balance for unfilled buy orders
         if side == 'buy' and remaining_size > 0:
             remaining_cost = price * remaining_size if token == 'YES' else (1 - price) * remaining_size
+            print(f"DEBUG: Deducting {remaining_cost} from user balance")
             deduct_user_balance(user_id, remaining_cost, supabase)
             
             # Record transaction
@@ -195,27 +195,23 @@ def place_order(market_id):
                 'description': f'Placed {side} order for {remaining_size} {token} shares',
                 'market_id': market_id,
                 'order_id': order_id,
-                'created_at': datetime.utcnow().isoformat()
+                'created_at': datetime.now(timezone.utc).isoformat()
             }).execute()
-        
-        # Update market statistics
-        if trades:
-            update_market_stats(market_id, trades, supabase)
         
         return jsonify({
             'success': True,
             'order': order_resp.data[0],
-            'trades': trades,
+            'trades': [],
             'filled_amount': filled_amount,
             'remaining_size': remaining_size
         })
         
     except Exception as e:
+        print(f"DEBUG: Overall exception: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': f'Order placement failed: {str(e)}'}), 500
 
-# Include all other endpoints from the previous trading blueprint...
-# (get_orderbook, cancel_order, get_user_orders, etc.)
-# They remain the same as in the previous version
 
 @trading_bp.route('/api/markets/<market_id>/orderbook', methods=['GET'])
 def get_orderbook(market_id):
@@ -233,6 +229,7 @@ def get_orderbook(market_id):
         orders = orders_resp.data if orders_resp.data else []
         
         # Organize orders by token and side
+        # Based on your schema: side = token type (YES/NO), token = direction (BUY/SELL)
         yes_bids = []
         yes_asks = []
         no_bids = []
@@ -250,15 +247,16 @@ def get_orderbook(market_id):
                 'order_id': order['id']
             }
             
-            if order['token'] == 'YES':
-                if order['side'] == 'buy':
+            # side = token type (YES/NO), token = direction (BUY/SELL)
+            if order['side'] == 'YES':  # YES token orders
+                if order['token'] == 'BUY':  # Buying YES tokens
                     yes_bids.append(order_info)
-                else:
+                else:  # Selling YES tokens
                     yes_asks.append(order_info)
-            else:  # NO token
-                if order['side'] == 'buy':
+            else:  # NO token orders (side == 'NO')
+                if order['token'] == 'BUY':  # Buying NO tokens
                     no_bids.append(order_info)
-                else:
+                else:  # Selling NO tokens
                     no_asks.append(order_info)
         
         # Sort orders (bids descending, asks ascending)
@@ -284,9 +282,391 @@ def get_orderbook(market_id):
     except Exception as e:
         return jsonify({'error': f'Failed to get orderbook: {str(e)}'}), 500
 
-# Helper functions remain the same as previous version
-def update_user_position(user_id, market_id, token, side, size, price, supabase):
-    """Update user position after a trade"""
+@trading_bp.route('/api/markets/<market_id>/cancel/<order_id>', methods=['DELETE'])
+@login_required
+def cancel_order(market_id, order_id):
+    """Cancel an order"""
+    try:
+        supabase = app.supabase
+        
+        # Get user info
+        user_id = get_current_user_id()
+        
+        # Get order details
+        order_resp = supabase.table('orders').select('*').eq('id', order_id).eq('user_id', user_id).single().execute()
+        if not order_resp.data:
+            return jsonify({'error': 'Order not found or not owned by user'}), 404
+        
+        order = order_resp.data
+        
+        # Check if order is cancellable
+        if order['status'] != 'open':
+            return jsonify({'error': 'Order cannot be cancelled'}), 400
+        
+        # Cancel in C++ orderbook if available
+        if ORDERBOOK_AVAILABLE:
+            orderbook = get_or_create_orderbook(market_id)
+            if orderbook:
+                try:
+                    import orderbook_cpp as ob
+                    orderbook.cancel_order(order_id)
+                except Exception as e:
+                    print(f"Failed to cancel order in C++ orderbook: {e}")
+        
+        # Update order status in database
+        update_resp = supabase.table('orders').update({
+            'status': 'cancelled'
+        }).eq('id', order_id).execute()
+        
+        if not update_resp.data:
+            return jsonify({'error': 'Failed to cancel order'}), 500
+        
+        # Refund user balance for buy orders
+        # Remember: side = token type (YES/NO), token = direction (BUY/SELL)
+        if order['token'] == 'BUY':  # This was a buy order
+            remaining_size = float(order['size']) - float(order.get('filled', 0))
+            if remaining_size > 0:
+                token_type = order['side']  # YES or NO
+                price = float(order['price'])
+                refund_amount = price * remaining_size if token_type == 'YES' else (1 - price) * remaining_size
+                
+                # Add refund to user balance
+                user_resp = supabase.table('users').select('balance').eq('id', user_id).single().execute()
+                if user_resp.data:
+                    current_balance = float(user_resp.data['balance'])
+                    new_balance = current_balance + refund_amount
+                    
+                    supabase.table('users').update({
+                        'balance': new_balance
+                    }).eq('id', user_id).execute()
+                    
+                    # Record refund transaction
+                    supabase.table('transactions').insert({
+                        'user_id': user_id,
+                        'amount': refund_amount,
+                        'type': 'order_cancelled',
+                        'description': f'Order cancellation refund',
+                        'market_id': market_id,
+                        'order_id': order_id,
+                        'created_at': datetime.now(timezone.utc).isoformat()
+                    }).execute()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Order {order_id} cancelled',
+            'order': update_resp.data[0]
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to cancel order: {str(e)}'}), 500
+
+@trading_bp.route('/api/user/orders', methods=['GET'])
+@login_required
+def get_user_orders():
+    """Get all orders for the current user"""
+    try:
+        supabase = app.supabase
+        
+        # Get user info
+        user_id = get_current_user_id()
+        
+        # Get query parameters
+        market_id = request.args.get('market_id')
+        status = request.args.get('status')
+        
+        # Build query
+        query = supabase.table('orders').select('*').eq('user_id', user_id)
+        
+        if market_id:
+            query = query.eq('market_id', market_id)
+        
+        if status:
+            query = query.eq('status', status)
+        
+        # Execute query with ordering
+        orders_resp = query.order('created_at', desc=True).execute()
+        orders = orders_resp.data if orders_resp.data else []
+        
+        return jsonify({
+            'success': True,
+            'orders': orders
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to get user orders: {str(e)}'}), 500
+
+@trading_bp.route('/api/user/positions', methods=['GET'])
+@login_required
+def get_user_positions():
+    """Get all positions for the current user"""
+    try:
+        supabase = app.supabase
+        
+        # Get user info
+        user_id = get_current_user_id()
+        
+        market_id = request.args.get('market_id')
+        
+        # Build query
+        query = supabase.table('positions').select('*').eq('user_id', user_id)
+        
+        if market_id:
+            query = query.eq('market_id', market_id)
+        
+        positions_resp = query.execute()
+        positions = positions_resp.data if positions_resp.data else []
+        
+        return jsonify({
+            'success': True,
+            'positions': positions
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to get user positions: {str(e)}'}), 500
+
+@trading_bp.route('/api/user/balance', methods=['GET'])
+@login_required
+def get_user_balance():
+    """Get current user balance"""
+    try:
+        supabase = app.supabase
+        
+        # Get user info
+        user_id = get_current_user_id()
+        
+        user_resp = supabase.table('users').select('balance, total_volume').eq('id', user_id).single().execute()
+        if not user_resp.data:
+            return jsonify({'error': 'User not found'}), 404
+        
+        return jsonify({
+            'success': True,
+            'balance': float(user_resp.data['balance']),
+            'total_volume': float(user_resp.data.get('total_volume', 0))
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to get user balance: {str(e)}'}), 500
+
+@trading_bp.route('/api/markets/<market_id>/trades', methods=['GET'])
+def get_market_trades(market_id):
+    """Get recent trades for a market"""
+    try:
+        supabase = app.supabase
+        
+        # Get query parameters
+        limit = int(request.args.get('limit', 50))
+        offset = int(request.args.get('offset', 0))
+        
+        # Get trades for this market
+        trades_resp = supabase.table('trades').select('*').eq('market_id', market_id).order('created_at', desc=True).limit(limit).offset(offset).execute()
+        trades = trades_resp.data if trades_resp.data else []
+        
+        return jsonify({
+            'success': True,
+            'trades': trades
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to get market trades: {str(e)}'}), 500
+
+@trading_bp.route('/api/test/add_sample_orders')
+def add_sample_orders():
+    """Add some sample orders for testing"""
+    try:
+        supabase = app.supabase
+        
+        # Get first active market
+        markets_resp = supabase.table('markets').select('*').eq('status', 'active').limit(1).execute()
+        if not markets_resp.data:
+            return jsonify({'error': 'No active markets found'}), 404
+        
+        market_id = markets_resp.data[0]['id']
+        
+        # Sample orders data
+        sample_orders = [
+            {'side': 'buy', 'token': 'YES', 'price': 0.45, 'size': 100},
+            {'side': 'buy', 'token': 'YES', 'price': 0.40, 'size': 150},
+            {'side': 'sell', 'token': 'YES', 'price': 0.55, 'size': 200},
+            {'side': 'sell', 'token': 'YES', 'price': 0.60, 'size': 100},
+            {'side': 'buy', 'token': 'NO', 'price': 0.45, 'size': 120},
+            {'side': 'buy', 'token': 'NO', 'price': 0.40, 'size': 180},
+            {'side': 'sell', 'token': 'NO', 'price': 0.55, 'size': 150},
+            {'side': 'sell', 'token': 'NO', 'price': 0.60, 'size': 90},
+        ]
+        
+        # Test user ID
+        TEST_USER_ID = "test-user-" + str(uuid.uuid4())[:8]
+        
+        # Create test user with balance
+        supabase.table('users').upsert({
+            'id': TEST_USER_ID,
+            'username': f'testuser_{TEST_USER_ID[:8]}',
+            'balance': 10000.0,
+            'created_at': datetime.utcnow().isoformat()
+        }).execute()
+        
+        # Create position for test user to enable selling
+        supabase.table('positions').upsert({
+            'user_id': TEST_USER_ID,
+            'market_id': market_id,
+            'yes_shares': 1000,
+            'no_shares': 1000,
+            'updated_at': datetime.utcnow().isoformat()
+        }).execute()
+        
+        orders_added = []
+        
+        for order_data in sample_orders:
+            order_id = str(uuid.uuid4())
+            
+            # Convert to database format
+            db_side = order_data['token'].upper()  # YES/NO goes to side
+            db_token = order_data['side'].upper()  # BUY/SELL goes to token
+            
+            # Add to database
+            db_order = {
+                'id': order_id,
+                'market_id': market_id,
+                'user_id': TEST_USER_ID,
+                'side': db_side,      # YES/NO
+                'token': db_token,    # BUY/SELL
+                'price': order_data['price'],
+                'size': order_data['size'],
+                'filled': 0,
+                'status': 'open',
+                'created_at': datetime.utcnow().isoformat()
+            }
+            
+            supabase.table('orders').insert(db_order).execute()
+            orders_added.append(db_order)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Added {len(orders_added)} sample orders',
+            'orders': orders_added
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to add sample orders: {str(e)}'}), 500
+
+@trading_bp.route('/api/test/bootstrap_market/<market_id>')
+def bootstrap_test_market(market_id):
+    """Bootstrap a specific market with initial liquidity"""
+    try:
+        # Check if market exists
+        supabase = app.supabase
+        market_resp = supabase.table('markets').select('*').eq('id', market_id).single().execute()
+        if not market_resp.data:
+            return jsonify({'error': 'Market not found'}), 404
+        
+        # Bootstrap the market
+        initial_prob = float(request.args.get('initial_probability', 0.5))
+        
+        if bootstrap_market(market_id, initial_prob):
+            return jsonify({
+                'success': True,
+                'message': f'Market {market_id} bootstrapped with {initial_prob} initial probability'
+            })
+        else:
+            return jsonify({'error': 'Failed to bootstrap market'}), 500
+            
+    except Exception as e:
+        return jsonify({'error': f'Failed to bootstrap market: {str(e)}'}), 500
+
+# Test endpoint to try different enum values
+@trading_bp.route('/api/debug/test-enum', methods=['POST'])
+def test_enum_values():
+    """Test what enum values work for side column"""
+    try:
+        supabase = app.supabase
+        
+        # Get a real market_id and user_id for testing
+        markets_resp = supabase.table('markets').select('id').limit(1).execute()
+        if not markets_resp.data:
+            return jsonify({'error': 'No markets found for testing'}), 400
+        
+        market_id = markets_resp.data[0]['id']
+        
+        # Use current user ID
+        user_id = get_current_user_id()
+        
+        test_values = ['buy', 'sell', 'BUY', 'SELL', 'YES', 'NO']
+        results = {}
+        
+        for value in test_values:
+            try:
+                # Try to insert a test order with this side value
+                test_order = {
+                    'id': str(uuid.uuid4()),  # Proper UUID
+                    'market_id': market_id,   # Real market UUID
+                    'user_id': user_id,       # Real user UUID
+                    'side': value,            # Test this enum value
+                    'price': 0.5,
+                    'size': 1,
+                    'token': 'YES',
+                    'status': 'open',
+                    'filled': 0
+                }
+                
+                # This will fail if the enum doesn't accept this value
+                insert_resp = supabase.table('orders').insert(test_order).execute()
+                results[value] = 'SUCCESS'
+                
+                # Clean up - delete the test order
+                if insert_resp.data:
+                    supabase.table('orders').delete().eq('id', test_order['id']).execute()
+                
+            except Exception as e:
+                results[value] = f'FAILED: {str(e)}'
+        
+        return jsonify({
+            'success': True,
+            'enum_test_results': results,
+            'test_market_id': market_id,
+            'test_user_id': user_id
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Test failed: {str(e)}'}), 500
+
+@trading_bp.route('/api/debug/enum-values', methods=['GET'])
+def debug_enum_values():
+    """Debug endpoint to check what enum values are expected"""
+    try:
+        supabase = app.supabase
+        
+        # Try to get existing orders to see what values are used
+        orders_resp = supabase.table('orders').select('*').limit(5).execute()
+        orders = orders_resp.data if orders_resp.data else []
+        
+        # Get unique values for each column
+        sides = list(set(order.get('side') for order in orders if order.get('side')))
+        statuses = list(set(order.get('status') for order in orders if order.get('status')))
+        tokens = list(set(order.get('token') for order in orders if order.get('token')))
+        
+        # Show the actual structure
+        sample_order = orders[0] if orders else {}
+        
+        return jsonify({
+            'success': True,
+            'existing_sides': sides,
+            'existing_statuses': statuses,
+            'existing_tokens': tokens,
+            'sample_order_structure': sample_order,
+            'all_columns': list(sample_order.keys()) if sample_order else []
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Debug failed: {str(e)}'}), 500
+
+# Helper Functions
+
+def update_user_position(user_id, market_id, token_type, direction, size, price, supabase):
+    """
+    Update user position after a trade
+    token_type: 'YES' or 'NO' 
+    direction: 'buy' or 'sell'
+    """
     try:
         # Get existing position
         position_resp = supabase.table('positions').select('*').eq('user_id', user_id).eq('market_id', market_id).single().execute()
@@ -297,13 +677,13 @@ def update_user_position(user_id, market_id, token, side, size, price, supabase)
             yes_shares = float(position.get('yes_shares', 0))
             no_shares = float(position.get('no_shares', 0))
             
-            if side == 'buy':
-                if token == 'YES':
+            if direction == 'buy':
+                if token_type == 'YES':
                     yes_shares += size
                 else:
                     no_shares += size
             else:  # sell
-                if token == 'YES':
+                if token_type == 'YES':
                     yes_shares -= size
                 else:
                     no_shares -= size
@@ -311,30 +691,34 @@ def update_user_position(user_id, market_id, token, side, size, price, supabase)
             supabase.table('positions').update({
                 'yes_shares': max(0, yes_shares),
                 'no_shares': max(0, no_shares),
-                'updated_at': datetime.utcnow().isoformat()
+                'updated_at': datetime.now(timezone.utc).isoformat()
             }).eq('user_id', user_id).eq('market_id', market_id).execute()
         else:
             # Create new position
-            yes_shares = size if (side == 'buy' and token == 'YES') else 0
-            no_shares = size if (side == 'buy' and token == 'NO') else 0
+            yes_shares = size if (direction == 'buy' and token_type == 'YES') else 0
+            no_shares = size if (direction == 'buy' and token_type == 'NO') else 0
             
             supabase.table('positions').insert({
                 'user_id': user_id,
                 'market_id': market_id,
                 'yes_shares': yes_shares,
                 'no_shares': no_shares,
-                'updated_at': datetime.utcnow().isoformat()
+                'updated_at': datetime.now(timezone.utc).isoformat()
             }).execute()
             
     except Exception as e:
         print(f"Error updating user position: {e}")
 
-def update_user_balances(taker_id, maker_id, taker_side, size, price, token, supabase):
-    """Update user balances after a trade"""
+def update_user_balances(taker_id, maker_id, taker_direction, size, price, token_type, supabase):
+    """
+    Update user balances after a trade
+    taker_direction: 'buy' or 'sell'
+    token_type: 'YES' or 'NO'
+    """
     try:
-        trade_value = price * size if token == 'YES' else (1 - price) * size
+        trade_value = price * size if token_type == 'YES' else (1 - price) * size
         
-        if taker_side == 'buy':
+        if taker_direction == 'buy':
             # Maker (seller) receives payment
             maker_resp = supabase.table('users').select('balance').eq('id', maker_id).single().execute()
             if maker_resp.data:
@@ -399,3 +783,109 @@ def update_market_stats(market_id, trades, supabase):
             
     except Exception as e:
         print(f"Error updating market stats: {e}")
+
+
+# Add this to trading.py temporarily to debug the orderbook endpoint
+
+@trading_bp.route('/api/markets/<market_id>/orderbook-debug', methods=['GET'])
+def debug_orderbook(market_id):
+    """Debug version of orderbook endpoint"""
+    try:
+        print(f"DEBUG: Getting orderbook for market {market_id}")
+        supabase = app.supabase
+        
+        # Check if market exists
+        print(f"DEBUG: Checking if market {market_id} exists...")
+        try:
+            market_resp = supabase.table('markets').select('id').eq('id', market_id).single().execute()
+            print(f"DEBUG: Market check response: {market_resp}")
+            
+            if not market_resp.data:
+                return jsonify({'error': 'Market not found'}), 404
+        except Exception as e:
+            print(f"DEBUG: Market check failed: {e}")
+            return jsonify({'error': f'Market check failed: {str(e)}'}), 500
+        
+        # Get active orders from database
+        print(f"DEBUG: Getting orders for market {market_id}...")
+        try:
+            orders_resp = supabase.table('orders').select('*').eq('market_id', market_id).eq('status', 'open').execute()
+            orders = orders_resp.data if orders_resp.data else []
+            print(f"DEBUG: Found {len(orders)} orders")
+            print(f"DEBUG: Orders: {orders}")
+        except Exception as e:
+            print(f"DEBUG: Orders query failed: {e}")
+            return jsonify({'error': f'Orders query failed: {str(e)}'}), 500
+        
+        # Organize orders by token and side
+        yes_bids = []
+        yes_asks = []
+        no_bids = []
+        no_asks = []
+        
+        for order in orders:
+            try:
+                remaining_size = float(order['size']) - float(order.get('filled', 0))
+                if remaining_size <= 0:
+                    continue
+                    
+                order_info = {
+                    'price': float(order['price']),
+                    'size': remaining_size,
+                    'user_id': order['user_id'],
+                    'order_id': order['id']
+                }
+                
+                print(f"DEBUG: Processing order: side={order['side']}, token={order['token']}, price={order['price']}")
+                
+                # side = token type (YES/NO), token = direction (BUY/SELL)
+                if order['side'] == 'YES':  # YES token orders
+                    if order['token'] == 'BUY':  # Buying YES tokens
+                        yes_bids.append(order_info)
+                    else:  # Selling YES tokens
+                        yes_asks.append(order_info)
+                else:  # NO token orders (side == 'NO')
+                    if order['token'] == 'BUY':  # Buying NO tokens
+                        no_bids.append(order_info)
+                    else:  # Selling NO tokens
+                        no_asks.append(order_info)
+                        
+            except Exception as e:
+                print(f"DEBUG: Error processing order {order.get('id', 'unknown')}: {e}")
+                continue
+        
+        # Sort orders (bids descending, asks ascending)
+        yes_bids.sort(key=lambda x: x['price'], reverse=True)
+        yes_asks.sort(key=lambda x: x['price'])
+        no_bids.sort(key=lambda x: x['price'], reverse=True)
+        no_asks.sort(key=lambda x: x['price'])
+        
+        result = {
+            'success': True,
+            'orderbook': {
+                'yes_token': {
+                    'bids': yes_bids,
+                    'asks': yes_asks
+                },
+                'no_token': {
+                    'bids': no_bids,
+                    'asks': no_asks
+                }
+            },
+            'debug_info': {
+                'total_orders': len(orders),
+                'yes_bids_count': len(yes_bids),
+                'yes_asks_count': len(yes_asks),
+                'no_bids_count': len(no_bids),
+                'no_asks_count': len(no_asks)
+            }
+        }
+        
+        print(f"DEBUG: Final result: {result}")
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"DEBUG: Overall exception in orderbook: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Orderbook failed: {str(e)}'}), 500

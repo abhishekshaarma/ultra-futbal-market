@@ -6,6 +6,16 @@ from datetime import datetime, timedelta
 
 markets_bp = Blueprint('markets', __name__)
 
+def get_current_user_id():
+    """Helper function to extract user ID from g.current_user"""
+    current_user = g.current_user
+    if hasattr(current_user, 'id'):
+        return current_user.id
+    elif isinstance(current_user, dict):
+        return current_user['id']
+    else:
+        return str(current_user)
+
 @markets_bp.route('/create-market')
 @login_required
 def create_market_page():
@@ -274,6 +284,14 @@ def can_resolve_market(market_id):
         
         market = market_resp.data
         current_user = g.current_user
+        
+        # Extract user info safely
+        user_id = get_current_user_id()
+        is_admin = False
+        if hasattr(current_user, 'is_admin'):
+            is_admin = current_user.is_admin
+        elif isinstance(current_user, dict):
+            is_admin = current_user.get('is_admin', False)
         
         # Check various conditions
         can_resolve = False

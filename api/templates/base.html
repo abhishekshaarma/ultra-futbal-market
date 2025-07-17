@@ -2,163 +2,401 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>{% block title %}App{% endblock %}</title>
+    <title>Markets - ULTRAX</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://fonts.googleapis.com/css?family=Press+Start+2P" rel="stylesheet">
     <link href="https://unpkg.com/nes.css@2.3.0/css/nes.min.css" rel="stylesheet" />
     <style>
-        :root {
-            --clr-primary: #39FF14;   /* Neon Aqua */
-            --clr-accent: #FF3CAC;    /* Neon Pink */
-            --clr-surface: #333333;   /* Deep Charcoal */
-            --clr-text: #FFFFFF;      /* White */
-        }
         html, body, pre, code, kbd, samp {
             font-family: 'Press Start 2P', 'Arial', sans-serif;
         }
         body {
-            background: var(--clr-surface);
-            color: var(--clr-text);
-            position: relative;
-            overflow-x: hidden;
+            background: #333333;
+            color: #FFFFFF;
+            padding: 20px;
         }
         
-        /* Moving Stars Background */
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: 
-                /* Stars */
-                radial-gradient(3px 3px at 20% 30%, rgba(255, 255, 255, 0.8) 50%, transparent 50%),
-                radial-gradient(2px 2px at 80% 70%, rgba(255, 255, 255, 0.6) 50%, transparent 50%),
-                radial-gradient(4px 4px at 40% 80%, rgba(255, 255, 255, 0.7) 50%, transparent 50%),
-                radial-gradient(2px 2px at 60% 20%, rgba(255, 255, 255, 0.5) 50%, transparent 50%),
-                radial-gradient(3px 3px at 10% 60%, rgba(255, 255, 255, 0.6) 50%, transparent 50%),
-                radial-gradient(2px 2px at 90% 40%, rgba(255, 255, 255, 0.7) 50%, transparent 50%),
-                radial-gradient(4px 4px at 30% 10%, rgba(255, 255, 255, 0.5) 50%, transparent 50%),
-                radial-gradient(3px 3px at 70% 90%, rgba(255, 255, 255, 0.8) 50%, transparent 50%);
-            background-size: 
-                200px 200px,
-                300px 300px,
-                250px 250px,
-                350px 350px,
-                400px 400px,
-                280px 280px,
-                320px 320px,
-                380px 380px;
-            animation: starMove 20s linear infinite;
-            pointer-events: none;
-            z-index: -1;
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
         }
         
-        /* Additional twinkling stars */
-        body::after {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: 
-                /* Twinkling stars */
-                radial-gradient(3px 3px at 15% 45%, rgba(255, 255, 255, 0.9) 50%, transparent 50%),
-                radial-gradient(2px 2px at 85% 25%, rgba(255, 255, 255, 0.8) 50%, transparent 50%),
-                radial-gradient(4px 4px at 55% 85%, rgba(255, 255, 255, 0.7) 50%, transparent 50%),
-                radial-gradient(3px 3px at 25% 75%, rgba(255, 255, 255, 0.6) 50%, transparent 50%);
-            background-size: 500px 500px, 600px 600px, 450px 450px, 550px 550px;
-            animation: twinkle 3s ease-in-out infinite;
-            pointer-events: none;
-            z-index: -1;
-        }
-        
-        @keyframes starMove {
-            0% { transform: translateX(-50px) translateY(-25px); }
-            50% { transform: translateX(25px) translateY(12px); }
-            100% { transform: translateX(-50px) translateY(-25px); }
-        }
-        
-        @keyframes twinkle {
-            0%, 100% { opacity: 0.3; }
-            50% { opacity: 1; }
-        }
-        .nes-container {
-            margin-top: 2em;
-            background: var(--clr-surface);
-            border-color: var(--clr-primary);
-        }
-        .navbar-nes {
-            background: var(--clr-surface);
-            color: var(--clr-text);
-            padding: 1em 0;
-            margin-bottom: 2em;
-            border-bottom: 2px solid var(--clr-primary);
-        }
-        .navbar-nes .container {
+        .nav {
             display: flex;
-            align-items: center;
             justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding: 1rem 0;
+            border-bottom: 2px solid #39FF14;
         }
-        .navbar-nes a {
-            color: var(--clr-text);
+        
+        .brand {
+            color: #39FF14;
+            font-size: 1.2rem;
             text-decoration: none;
-            margin-right: 2em;
         }
-        .navbar-nes a:last-child {
-            margin-right: 0;
+        
+        .nav-links {
+            display: flex;
+            gap: 1rem;
         }
-        .navbar-nes .brand {
-            font-weight: bold;
-            font-size: 1.2em;
-            color: var(--clr-primary);
+        
+        .nav-links a {
+            color: #FFFFFF;
+            text-decoration: none;
+            font-size: 0.6rem;
         }
-        .nes-btn.is-primary {
-            background-color: var(--clr-primary);
-            color: var(--clr-surface);
-            border-color: var(--clr-primary);
+        
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
         }
-        .nes-btn.is-primary:hover {
-            background-color: var(--clr-accent);
-            color: var(--clr-surface);
+        
+        .header h1 {
+            color: #39FF14;
+            margin-bottom: 1rem;
         }
-        .nes-btn.is-success {
-            background-color: var(--clr-accent);
-            color: var(--clr-surface);
-            border-color: var(--clr-accent);
+        
+        .stats {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
         }
-        .nes-btn.is-success:hover {
-            background-color: var(--clr-primary);
-            color: var(--clr-surface);
+        
+        .stat-box {
+            background: #333333;
+            border: 2px solid #39FF14;
+            padding: 1rem;
+            text-align: center;
+            min-width: 150px;
         }
-        .nes-text.is-primary {
-            color: var(--clr-primary) !important;
+        
+        .stat-number {
+            color: #39FF14;
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
         }
-        .nes-table.is-bordered td, .nes-table.is-bordered th {
-            border-color: var(--clr-primary);
+        
+        .stat-label {
+            color: #FFFFFF;
+            font-size: 0.5rem;
         }
-        .nes-container.with-title > .title {
-            color: var(--clr-primary);
+        
+        .markets-grid {
+            display: grid;
+            gap: 1rem;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+        
+        .market-card {
+            background: #333333;
+            border: 2px solid #39FF14;
+            padding: 1rem;
+        }
+        
+        .market-title {
+            color: #39FF14;
+            font-size: 0.7rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .market-description {
+            color: #FFFFFF;
+            font-size: 0.5rem;
+            margin-bottom: 1rem;
+            opacity: 0.8;
+        }
+        
+        .market-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 0.3rem;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #39FF14;
+        }
+        
+        .stat-value {
+            color: #FF3CAC;
+            font-size: 0.6rem;
+            margin-bottom: 0.2rem;
+        }
+        
+        .stat-title {
+            color: #FFFFFF;
+            font-size: 0.4rem;
+        }
+        
+        .price-tokens {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .token {
+            padding: 0.5rem;
+            text-align: center;
+            border: 2px solid;
+        }
+        
+        .token-yes {
+            background: #39FF14;
+            color: #333333;
+            border-color: #39FF14;
+        }
+        
+        .token-no {
+            background: #FF3CAC;
+            color: #333333;
+            border-color: #FF3CAC;
+        }
+        
+        .token-label {
+            font-size: 0.5rem;
+            margin-bottom: 0.3rem;
+        }
+        
+        .token-price {
+            font-size: 0.6rem;
+        }
+        
+        .btn-trade {
+            width: 100%;
+            background: #FF3CAC;
+            color: #333333;
+            border: 2px solid #FF3CAC;
+            padding: 0.5rem;
+            font-size: 0.5rem;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        
+        .btn-trade:hover {
+            background: #39FF14;
+            border-color: #39FF14;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #39FF14;
+        }
+        
+        @media (max-width: 768px) {
+            .nav {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .stats {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .markets-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
-    {% block head %}{% endblock %}
 </head>
 <body>
-<nav class="navbar-nes">
-  <div class="container">
-    <span class="brand nes-text is-primary"><a href="/">ULTRAX</a></span>
-    <div style="display: flex; align-items: center; width: 100%; justify-content: space-between;">
-      <a href="/markets" class="nes-text" style="color:#FF3CAC ;margin:  auto ;font-weight: bold;">Markets</a>
-      <a href="/profile" class="nes-text">Dashboard</a>
+    <div class="container">
+        <!-- Navigation -->
+        <nav class="nav">
+            <a href="/" class="brand">🎮 ULTRAX</a>
+            <div class="nav-links">
+                <a href="/markets">Markets</a>
+                <a href="/dashboard">Dashboard</a>
+                <a href="/logout">Logout</a>
+            </div>
+        </nav>
 
-      <a href="/logout" class="nes-text">Logout</a>
+        <!-- Header -->
+        <header class="header">
+            <h1>🎯 Prediction Markets</h1>
+            <p>Trade on the outcome of future events!</p>
+        </header>
+
+        <!-- Stats -->
+        <div class="stats">
+            <div class="stat-box">
+                <div class="stat-number" id="total-markets">0</div>
+                <div class="stat-label">MARKETS</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number">$<span id="user-balance">1000.00</span></div>
+                <div class="stat-label">BALANCE</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="total-volume">$0</div>
+                <div class="stat-label">VOLUME</div>
+            </div>
+        </div>
+
+        <!-- Markets -->
+        <div id="loading" class="loading">🎮 Loading markets...</div>
+        <div class="markets-grid" id="markets-container" style="display: none;">
+            <!-- Markets will be loaded here -->
+        </div>
     </div>
-  </div>
-</nav>
-<div class="container nes-container with-title is-centered is-rounded">
-    {% block content %}{% endblock %}
-</div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            loadUserBalance();
+            loadMarkets();
+        });
+
+        async function loadUserBalance() {
+            try {
+                const response = await fetch('/api/user/balance');
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById('user-balance').textContent = data.balance.toFixed(2);
+                }
+            } catch (error) {
+                console.error('Error loading balance:', error);
+            }
+        }
+
+        async function loadMarkets() {
+            try {
+                const response = await fetch('/api/markets');
+                const data = await response.json();
+                
+                if (data.success && data.markets.length > 0) {
+                    document.getElementById('total-markets').textContent = data.markets.length;
+                    renderMarkets(data.markets);
+                    loadAllOrderbooks();
+                    
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('markets-container').style.display = 'grid';
+                } else {
+                    document.getElementById('loading').innerHTML = '😭 No markets found';
+                }
+            } catch (error) {
+                console.error('Error loading markets:', error);
+                document.getElementById('loading').innerHTML = '❌ Error loading markets';
+            }
+        }
+
+        function renderMarkets(markets) {
+            const container = document.getElementById('markets-container');
+            
+            container.innerHTML = markets.map(market => `
+                <div class="market-card" data-market-id="${market.id}">
+                    <div class="market-title">${escapeHtml(market.title)}</div>
+                    <div class="market-description">${escapeHtml(market.description || '')}</div>
+                    
+                    <div class="market-stats">
+                        <div class="stat-item">
+                            <div class="stat-value order-count">0</div>
+                            <div class="stat-title">ORDERS</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value best-bid">-</div>
+                            <div class="stat-title">BEST BID</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value best-ask">-</div>
+                            <div class="stat-title">BEST ASK</div>
+                        </div>
+                    </div>
+                    
+                    <div class="price-tokens">
+                        <div class="token token-yes">
+                            <div class="token-label">YES</div>
+                            <div class="token-price">$${(market.yes_price || 0.5).toFixed(2)}</div>
+                        </div>
+                        <div class="token token-no">
+                            <div class="token-label">NO</div>
+                            <div class="token-price">$${(market.no_price || 0.5).toFixed(2)}</div>
+                        </div>
+                    </div>
+                    
+                    <button class="btn-trade" onclick="window.location.href='/markets/${market.id}'">
+                        🎯 TRADE NOW
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        async function loadAllOrderbooks() {
+            const marketCards = document.querySelectorAll('[data-market-id]');
+            
+            for (const card of marketCards) {
+                const marketId = card.getAttribute('data-market-id');
+                await loadOrderbookForMarket(marketId, card);
+            }
+        }
+
+        async function loadOrderbookForMarket(marketId, card) {
+            try {
+                const response = await fetch(`/api/markets/${marketId}/orderbook`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const orderbook = data.orderbook;
+                    
+                    const totalOrders = 
+                        orderbook.yes_token.bids.length + 
+                        orderbook.yes_token.asks.length + 
+                        orderbook.no_token.bids.length + 
+                        orderbook.no_token.asks.length;
+                    
+                    let bestBid = null;
+                    const allBids = [...orderbook.yes_token.bids, ...orderbook.no_token.bids];
+                    if (allBids.length > 0) {
+                        bestBid = Math.max(...allBids.map(bid => bid.price));
+                    }
+                    
+                    let bestAsk = null;
+                    const allAsks = [...orderbook.yes_token.asks, ...orderbook.no_token.asks];
+                    if (allAsks.length > 0) {
+                        bestAsk = Math.min(...allAsks.map(ask => ask.price));
+                    }
+                    
+                    updateMarketCard(card, totalOrders, bestBid, bestAsk);
+                }
+            } catch (error) {
+                console.error(`Error loading orderbook for ${marketId}:`, error);
+            }
+        }
+
+        function updateMarketCard(card, totalOrders, bestBid, bestAsk) {
+            const orderCountElement = card.querySelector('.order-count');
+            if (orderCountElement) {
+                orderCountElement.textContent = totalOrders;
+            }
+            
+            const bestBidElement = card.querySelector('.best-bid');
+            if (bestBidElement) {
+                bestBidElement.textContent = bestBid ? `$${bestBid.toFixed(2)}` : 'no bids';
+            }
+            
+            const bestAskElement = card.querySelector('.best-ask');
+            if (bestAskElement) {
+                bestAskElement.textContent = bestAsk ? `$${bestAsk.toFixed(2)}` : 'no asks';
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Refresh every 30 seconds
+        setInterval(() => {
+            loadAllOrderbooks();
+        }, 30000);
+    </script>
 </body>
-</html> 
+</html>
