@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify, render_template, g, current_app
 from api.auth import login_required, admin_required
 from api.utils import bootstrap_market, get_or_create_orderbook
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 markets_bp = Blueprint('markets', __name__)
 
@@ -62,7 +62,7 @@ def create_market():
             return jsonify({'error': 'Invalid end_date format. Use ISO format.'}), 400
         
         # Validate end date is in the future
-        if end_date <= datetime.now():
+        if end_date <= datetime.now(timezone.utc):
             return jsonify({'error': 'End date must be in the future'}), 400
         
         # Generate market ID
@@ -80,7 +80,7 @@ def create_market():
             'no_price': 1.0 - data.get('initial_probability', 0.5),
             'total_volume': 0,
             'token': data.get('token', 'MARKET'),
-            'created_at': datetime.utcnow().isoformat()
+            'created_at': datetime.now(timezone.utc).isoformat()
         }
         
         supabase = current_app.supabase
@@ -104,6 +104,7 @@ def create_market():
         })
         
     except Exception as e:
+        import traceback; traceback.print_exc()
         return jsonify({'error': f'Failed to create market: {str(e)}'}), 500
 
 @markets_bp.route('/markets/<market_id>')
@@ -150,6 +151,7 @@ def market_detail(market_id):
                              market_prices=market_prices,
                              current_user=getattr(g, 'current_user', None))
     except Exception as e:
+        import traceback; traceback.print_exc()
         return f"Error loading market: {e}", 500
 
 @markets_bp.route('/api/markets/<market_id>/resolve', methods=['POST'])
@@ -176,7 +178,7 @@ def resolve_market(market_id):
             return jsonify({'error': 'Market is not active'}), 400
         
         # Update market status and outcome
-        resolve_date = datetime.utcnow()
+        resolve_date = datetime.now(timezone.utc)
         update_resp = supabase.table('markets').update({
             'status': 'resolved',
             'resolution': outcome,
@@ -206,6 +208,7 @@ def resolve_market(market_id):
         })
         
     except Exception as e:
+        import traceback; traceback.print_exc()
         return jsonify({'error': f'Failed to resolve market: {str(e)}'}), 500
 
 @markets_bp.route('/api/markets/<market_id>/resolution-preview', methods=['POST'])
@@ -268,6 +271,7 @@ def preview_resolution(market_id):
         })
         
     except Exception as e:
+        import traceback; traceback.print_exc()
         return jsonify({'error': f'Failed to preview resolution: {str(e)}'}), 500
 
 @markets_bp.route('/api/markets/<market_id>/can-resolve', methods=['GET'])
@@ -308,7 +312,7 @@ def can_resolve_market(market_id):
         
         # Check if market has ended
         end_date = datetime.fromisoformat(market['end_date'].replace('Z', '+00:00'))
-        market_ended = datetime.now() >= end_date
+        market_ended = datetime.now(timezone.utc) >= end_date
         
         return jsonify({
             'can_resolve': can_resolve,
@@ -319,6 +323,7 @@ def can_resolve_market(market_id):
         })
         
     except Exception as e:
+        import traceback; traceback.print_exc()
         return jsonify({'error': f'Failed to check resolution permissions: {str(e)}'}), 500
 
 @markets_bp.route('/api/markets/<market_id>/orderbook', methods=['GET'])
@@ -387,6 +392,7 @@ def get_orderbook(market_id):
         })
         
     except Exception as e:
+        import traceback; traceback.print_exc()
         return jsonify({'error': f'Failed to get orderbook: {str(e)}'}), 500
 
 def process_market_payouts(market_id, outcome, supabase):
@@ -423,10 +429,11 @@ def process_market_payouts(market_id, outcome, supabase):
                         'type': 'market_payout',
                         'description': f'Market resolution payout',
                         'market_id': market_id,
-                        'created_at': datetime.utcnow().isoformat()
+                        'created_at': datetime.now(timezone.utc).isoformat()
                     }).execute()
         
         print(f"Processed payouts for market {market_id}")
         
     except Exception as e:
+        import traceback; traceback.print_exc()
         print(f"Error processing payouts: {e}")

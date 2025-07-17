@@ -207,9 +207,7 @@ def place_order(market_id):
         })
         
     except Exception as e:
-        print(f"DEBUG: Overall exception: {e}")
-        import traceback
-        traceback.print_exc()
+        import traceback; traceback.print_exc()
         return jsonify({'error': f'Order placement failed: {str(e)}'}), 500
 
 
@@ -280,6 +278,7 @@ def get_orderbook(market_id):
         })
             
     except Exception as e:
+        import traceback; traceback.print_exc()
         return jsonify({'error': f'Failed to get orderbook: {str(e)}'}), 500
 
 @trading_bp.route('/api/markets/<market_id>/cancel/<order_id>', methods=['DELETE'])
@@ -358,6 +357,7 @@ def cancel_order(market_id, order_id):
         })
         
     except Exception as e:
+        import traceback; traceback.print_exc()
         return jsonify({'error': f'Failed to cancel order: {str(e)}'}), 500
 
 @trading_bp.route('/api/user/orders', methods=['GET'])
@@ -393,6 +393,7 @@ def get_user_orders():
         })
         
     except Exception as e:
+        import traceback; traceback.print_exc()
         return jsonify({'error': f'Failed to get user orders: {str(e)}'}), 500
 
 @trading_bp.route('/api/user/positions', methods=['GET'])
@@ -445,6 +446,7 @@ def get_user_balance():
         })
         
     except Exception as e:
+        import traceback; traceback.print_exc()
         return jsonify({'error': f'Failed to get user balance: {str(e)}'}), 500
 
 @trading_bp.route('/api/markets/<market_id>/trades', methods=['GET'])
@@ -547,6 +549,7 @@ def add_sample_orders():
         })
         
     except Exception as e:
+        import traceback; traceback.print_exc()
         return jsonify({'error': f'Failed to add sample orders: {str(e)}'}), 500
 
 @trading_bp.route('/api/test/bootstrap_market/<market_id>')
@@ -571,6 +574,7 @@ def bootstrap_test_market(market_id):
             return jsonify({'error': 'Failed to bootstrap market'}), 500
             
     except Exception as e:
+        import traceback; traceback.print_exc()
         return jsonify({'error': f'Failed to bootstrap market: {str(e)}'}), 500
 
 # Test endpoint to try different enum values
@@ -627,6 +631,7 @@ def test_enum_values():
         })
         
     except Exception as e:
+        import traceback; traceback.print_exc()
         return jsonify({'error': f'Test failed: {str(e)}'}), 500
 
 @trading_bp.route('/api/debug/enum-values', methods=['GET'])
@@ -657,6 +662,7 @@ def debug_enum_values():
         })
         
     except Exception as e:
+        import traceback; traceback.print_exc()
         return jsonify({'error': f'Debug failed: {str(e)}'}), 500
 
 # Helper Functions
@@ -885,7 +891,5 @@ def debug_orderbook(market_id):
         return jsonify(result)
         
     except Exception as e:
-        print(f"DEBUG: Overall exception in orderbook: {e}")
-        import traceback
-        traceback.print_exc()
+        import traceback; traceback.print_exc()
         return jsonify({'error': f'Orderbook failed: {str(e)}'}), 500

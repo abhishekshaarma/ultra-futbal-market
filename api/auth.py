@@ -18,15 +18,15 @@ def login_required(f):
         if token and token.startswith('Bearer '):
             token = token[7:]
         if not token:
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('user.login'))
         try:
             user = app.supabase.auth.get_user(token)
             user_obj = getattr(user, 'user', None)
             if user_obj is None:
-                return redirect(url_for('auth.login'))
+                return redirect(url_for('user.login'))
             g.current_user = user_obj
         except Exception:
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('user.login'))
         return f(*args, **kwargs)
     return decorated_function
 
