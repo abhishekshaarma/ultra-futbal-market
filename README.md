@@ -19,11 +19,7 @@ A serverless Flask web app for trading in prediction markets. Built with Supabas
 - **Order Matching**: C++ extension via Python bindings
 - **Deployment**: Vercel (serverless, via `vercel.json`)
 
-## Architecture
-
-## Architecture (Mermaid Diagram)
-
-## Architecture (Mermaid Diagram)
+## Architecture 
 
 ```mermaid
 graph TD
