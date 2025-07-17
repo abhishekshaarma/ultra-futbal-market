@@ -25,7 +25,7 @@ A serverless Flask web app for trading in prediction markets. Built with Supabas
 
 ```mermaid
 graph TD
-  A[User Browser] -->|HTTP/HTTPS| B[Flask App (Vercel Serverless)]
+  A[User Browser] --> B[Flask App (Vercel Serverless)]
   B --> C[Supabase (Postgres DB)]
   B --> D[C++ Orderbook Extension]
   B --> E[Jinja2 Templates / Static Files]
