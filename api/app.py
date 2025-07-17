@@ -1,2 +1,43 @@
+import os
+from flask import Flask
+from dotenv import load_dotenv
+from supabase import create_client, Client
+
+def create_app():
+    load_dotenv()
+    app = Flask(__name__)
+    app.config.from_object('api.config.Config')
+    app.secret_key = os.getenv("FLASK_SECRET_KEY", "super-secret-key")
+
+    # Supabase client
+    SUPABASE_URL = os.getenv('SUPABASE_URL')
+    SUPABASE_KEY = os.getenv('SUPABASE_API_KEY')
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        raise RuntimeError('SUPABASE_URL and SUPABASE_KEY must be set in environment variables')
+    app.supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+    # Orderbook markets dict (in-memory)
+    app.markets = {}
+
+    # Register blueprints
+    from api.routes.markets import markets_bp
+    from api.routes.trading import trading_bp
+    from api.routes.user import user_bp
+    from api.auth import auth_bp
+    app.register_blueprint(markets_bp)
+    app.register_blueprint(trading_bp)
+    app.register_blueprint(user_bp)
+    app.register_blueprint(auth_bp)
+
+    # Load all orderbooks from DB on startup
+    from api.utils import load_all_orderbooks_from_db
+    with app.app_context():
+        load_all_orderbooks_from_db()
+
+    return app
+
+# At the end of the file, expose the app object for Vercel
+app = create_app()
+
 
 

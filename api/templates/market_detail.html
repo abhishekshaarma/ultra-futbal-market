@@ -1,0 +1,458 @@
+{% extends 'base.html' %}
+{% block title %}Market: {{ market.title or market.name or market.id }}{% endblock %}
+{% block head %}
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+  <style>
+.resolution-preview {
+  background: #f0f0f0;
+  padding: 15px;
+  margin: 10px 0;
+  border-radius: 5px;
+  font-family: monospace;
+}
+.payout-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-bottom: 1px solid #ddd;
+}
+.resolution-success {
+  background: #e8f5e8;
+  color: #2e7d32;
+  padding: 15px;
+  border-radius: 5px;
+  margin: 10px 0;
+}
+</style>
+{% endblock %}
+{% block content %}
+<h1 class="nes-text is-primary">{{ market.title or market.name or market.id }}</h1>
+<p>{{ market.description }}</p>
+
+{# {% if user=g.current_user  %} #}
+<!-- Market Resolution Panel (only show for admins/when market ended) -->
+<div class="nes-container with-title" id="resolutionPanel" style="display: none;">
+  <p class="title">Resolve Market</p>
+  <div id="resolutionStatus"></div>
+  <!-- Resolution Preview -->
+  <div style="margin-bottom: 20px;">
+    <p><strong>Preview Resolution:</strong></p>
+    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+      <button class="nes-btn" onclick="previewResolution('YES')" id="previewYesBtn">
+        Preview YES
+      </button>
+      <button class="nes-btn" onclick="previewResolution('NO')" id="previewNoBtn">
+        Preview NO
+      </button>
+    </div>
+    <div id="previewResults" class="nes-container" style="display: none;">
+      <h4>Resolution Preview</h4>
+      <div id="previewContent"></div>
+    </div>
+  </div>
+  <!-- Actual Resolution -->
+  <div style="border-top: 2px solid #ccc; padding-top: 20px;">
+    <p><strong>Resolve Market:</strong></p>
+    <p class="nes-text is-warning">⚠️ This action cannot be undone!</p>
+    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+      <button class="nes-btn is-success" onclick="resolveMarket('YES')" id="resolveYesBtn">
+        Resolve as YES
+      </button>
+      <button class="nes-btn is-error" onclick="resolveMarket('NO')" id="resolveNoBtn">
+        Resolve as NO
+      </button>
+    </div>
+  </div>
+</div>
+{# {% endif %} #}
+
+<!-- Market Status Display -->
+<div class="nes-container with-title">
+  <p class="title">Market Status</p>
+  <div id="marketStatus">
+    <p>Status: <span id="statusText" class="nes-text is-primary">Loading...</span></p>
+    <p>End Date: <span id="endDate">-</span></p>
+    <div id="resolutionInfo" style="display: none;">
+      <p>Resolved: <span id="resolutionOutcome" class="nes-text is-success">-</span></p>
+      <p>Resolved At: <span id="resolutionDate">-</span></p>
+    </div>
+  </div>
+</div>
+
+<div class="nes-container with-title is-centered is-rounded" style="margin-bottom:2em;">
+  <p class="title" style="background-color: #333333">Trade</p>
+  <form id="trade-form" class="nes-container is-rounded">
+    <div>
+      <label for="token">Token:</label>
+      <select name="token" id="token" class="nes-select" style="width: 200px; font-size: 1.2em;">
+        <option value="YES">YES</option>
+        <option value="NO">NO</option>
+      </select>
+    </div>
+    <div>
+      <label for="side">Side:</label>
+      <select name="side" id="side" class="nes-select" style="width: 200px; font-size: 1.2em;">
+        <option value="BUY">Buy</option>
+        <option value="SELL">Sell</option>
+      </select>
+    </div>
+    <div>
+      <label for="price">Price ($):</label>
+      <input type="number" step="0.01" min="0.01" max="99.99" name="price" id="price" class="nes-input" required>
+    </div>
+    <div>
+      <label for="quantity">Quantity:</label>
+      <input type="number" min="1" name="quantity" id="quantity" class="nes-input" required>
+    </div>
+    <button type="submit" class="nes-btn is-success" style="margin-top:1em;">Place Order</button>
+  </form>
+  <div id="trade-result" style="margin-top:1em;"></div>
+</div>
+<!-- Best Bid/Ask Display -->
+<div class="nes-container with-title" style="margin-bottom: 2em;">
+  <p class="title">Market Prices</p>
+  <div style="display: flex; flex-wrap: wrap; gap: 40px; justify-content: center; align-items: flex-start;">
+    <div style="min-width: 180px;">
+      <div class="nes-text is-primary" style="font-weight: bold; text-align: center;">YES Token</div>
+      <div class="nes-badge" style="margin: 0.5em 0; display: flex; justify-content: center;">
+        <span class="is-success">Best Bid: $<span id="bestBid">-</span></span>
+      </div>
+      <div class="nes-badge" style="margin: 0.5em 0; display: flex; justify-content: center;">
+        <span class="is-error">Best Ask: $<span id="bestAsk">-</span></span>
+      </div>
+    </div>
+    <div style="min-width: 180px;">
+      <div class="nes-text is-primary" style="font-weight: bold; text-align: center;">NO Token</div>
+      <div class="nes-badge" style="margin: 0.5em 0; display: flex; justify-content: center;">
+        <span class="is-success">Best Bid: $<span id="bestBidNo">-</span></span>
+      </div>
+      <div class="nes-badge" style="margin: 0.5em 0; display: flex; justify-content: center;">
+        <span class="is-error">Best Ask: $<span id="bestAskNo">-</span></span>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top: 1.5em; text-align: center;">
+    <span class="nes-text is-primary" style="font-size: 1.2em; font-weight: bold;">Current Probability: <span id="currentPrice">-%</span></span>
+  </div>
+</div>
+<!-- Probability Chart -->
+<div class="nes-container with-title">
+  <p class="title">Probability Chart</p>
+  <canvas id="probabilityChart" style="max-height: 300px;"></canvas>
+</div>
+<!-- Orderbook -->
+<div class="nes-container with-title">
+  <p class="title">Order Book</p>
+  <div id="orderbookLevels" style="font-family: monospace; font-size: 14px;">
+    Loading...
+  </div>
+</div>
+<!-- Recent Trades -->
+<div class="nes-container with-title">
+  <p class="title">Recent Trades</p>
+  <div id="tradesList" style="max-height: 200px; overflow-y: auto;">
+    No trades yet...
+  </div>
+</div>
+<script>
+const marketId = "{{ market.id }}";
+let chart;
+let priceHistory = [];
+
+function initChart() {
+    const ctx = document.getElementById('probabilityChart').getContext('2d');
+    chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Probability (%)',
+                data: [],
+                borderColor: '#92cc41',
+                backgroundColor: 'rgba(146, 204, 65, 0.1)',
+                borderWidth: 3,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { beginAtZero: true, max: 100 }
+            }
+        }
+    });
+}
+
+async function loadOrderbook() {
+    try {
+        const response = await fetch(`/api/markets/${marketId}/orderbook`);
+        const data = await response.json();
+        if (data.success) {
+            // YES token
+            const yesBestBid = data.yes_token.best_bid;
+            const yesBestAsk = data.yes_token.best_ask;
+            // NO token
+            const noBestBid = data.no_token.best_bid;
+            const noBestAsk = data.no_token.best_ask;
+
+            // Update best bid/ask display for both tokens
+            document.getElementById('bestBid').textContent = yesBestBid !== null ? yesBestBid.toFixed(2) : '-';
+            document.getElementById('bestAsk').textContent = yesBestAsk !== null ? yesBestAsk.toFixed(2) : '-';
+            document.getElementById('bestBidNo').textContent = noBestBid !== null ? noBestBid.toFixed(2) : '-';
+            document.getElementById('bestAskNo').textContent = noBestAsk !== null ? noBestAsk.toFixed(2) : '-';
+
+            // Implied probability (from YES)
+            if (yesBestBid !== null && yesBestAsk !== null) {
+                const mid = (yesBestBid + yesBestAsk) / 2;
+                document.getElementById('currentPrice').textContent = `${(mid * 100).toFixed(1)}%`;
+                updateChart(mid);
+            }
+
+            // Update orderbook display for both tokens
+            updateOrderbookDisplay(data.yes_token, data.no_token);
+        }
+    } catch (error) {
+        console.error('Error loading orderbook:', error);
+    }
+}
+
+function updateOrderbookDisplay(yes, no) {
+    const container = document.getElementById('orderbookLevels');
+    container.innerHTML = '<b>YES Orderbook</b><br>';
+    yes.asks.slice().reverse().forEach(ask => {
+        container.innerHTML += `<div style="color: #e76e55;">SELL ${ask.quantity} @ $${ask.price.toFixed(2)}</div>`;
+    });
+    yes.bids.forEach(bid => {
+        container.innerHTML += `<div style="color: #92cc41;">BUY ${bid.quantity} @ $${bid.price.toFixed(2)}</div>`;
+    });
+    container.innerHTML += '<br><b>NO Orderbook</b><br>';
+    no.asks.slice().reverse().forEach(ask => {
+        container.innerHTML += `<div style="color: #e76e55;">SELL ${ask.quantity} @ $${ask.price.toFixed(2)}</div>`;
+    });
+    no.bids.forEach(bid => {
+        container.innerHTML += `<div style="color: #92cc41;">BUY ${bid.quantity} @ $${bid.price.toFixed(2)}</div>`;
+    });
+}
+
+function updateChart(price) {
+    const now = new Date();
+    chart.data.labels.push(now.toLocaleTimeString());
+    chart.data.datasets[0].data.push(price * 100);
+    if (chart.data.labels.length > 15) {
+        chart.data.labels.shift();
+        chart.data.datasets[0].data.shift();
+    }
+    chart.update('none');
+}
+
+function addTrade(trade) {
+    const tradesList = document.getElementById('tradesList');
+    const tradeDiv = document.createElement('div');
+    tradeDiv.innerHTML = `<span class="nes-text is-primary">${trade.quantity} @ $${trade.price.toFixed(2)} (${trade.token})</span> - ${new Date().toLocaleTimeString()}`;
+    tradesList.insertBefore(tradeDiv, tradesList.firstChild);
+    // Keep only last 10 trades
+    while (tradesList.children.length > 10) {
+        tradesList.removeChild(tradesList.lastChild);
+    }
+}
+
+// AJAX trade form
+  document.getElementById('trade-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const form = e.target;
+    const data = {
+      token: form.token.value,
+      side: form.side.value,
+      price: form.price.value,
+      size: form.quantity.value, // send as 'size'
+      type: 'LIMIT'
+    };
+    const resultDiv = document.getElementById('trade-result');
+    resultDiv.innerHTML = '';
+    try {
+      const resp = await fetch(`/api/markets/${marketId}/orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+      });
+      const respData = await resp.json();
+      if (resp.ok && respData.success) {
+        if (respData.trades && respData.trades.length > 0) {
+          let table = `<table class='nes-table is-bordered is-centered' style='margin-top:1em; color: black;'>`;
+          table += `<thead><tr><th>Buyer Order ID</th><th>Seller Order ID</th><th>Price</th><th>Quantity</th><th>Token</th></tr></thead><tbody>`;
+          for (const trade of respData.trades) {
+            table += `<tr>`;
+            table += `<td>${trade.buyer_order_id}</td>`;
+            table += `<td>${trade.seller_order_id}</td>`;
+            table += `<td>$${trade.price}</td>`;
+            table += `<td>${trade.quantity}</td>`;
+            table += `<td>${trade.token}</td>`;
+            table += `</tr>`;
+            // Add to chart and trade history
+            updateChart(trade.price);
+            addTrade(trade);
+          }
+          table += `</tbody></table>`;
+          resultDiv.innerHTML = `<span class='nes-text is-success'>Order placed!</span>` + table;
+        } else {
+          resultDiv.innerHTML = `<span class='nes-text is-success'>Order placed! (No trades matched)</span>`;
+        }
+        form.reset();
+        loadOrderbook();
+      } else {
+        resultDiv.innerHTML = `<span class='nes-text is-error'>${respData.error || 'Order failed.'}</span>`;
+      }
+    } catch (err) {
+      resultDiv.innerHTML = `<span class='nes-text is-error'>Error: ${err}</span>`;
+    }
+  });
+
+// Initialize when page loads
+  document.addEventListener('DOMContentLoaded', function() {
+    if (document.getElementById('probabilityChart')) {
+        initChart();
+        loadOrderbook();
+        setInterval(loadOrderbook, 3000); // Update every 3 seconds
+    }
+  });
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Market resolution functions
+// Check if user can resolve market when page loads
+async function checkResolutionPermissions() {
+    try {
+        const response = await fetch(`/api/markets/${marketId}/can-resolve`);
+        const data = await response.json();
+        if (data.can_resolve) {
+            document.getElementById('resolutionPanel').style.display = 'block';
+            document.getElementById('resolutionStatus').innerHTML = 
+                '<p class="nes-text is-primary">✅ You can resolve this market</p>';
+        } else {
+            if (data.reason) {
+                const panel = document.getElementById('resolutionPanel');
+                panel.style.display = 'block';
+                document.getElementById('resolutionStatus').innerHTML = 
+                    `<p class="nes-text is-disabled">❌ ${data.reason}</p>`;
+                // Disable resolution buttons
+                document.getElementById('resolveYesBtn').disabled = true;
+                document.getElementById('resolveNoBtn').disabled = true;
+            }
+        }
+        // Update market status display
+        updateMarketStatus(data);
+    } catch (error) {
+        console.error('Error checking resolution permissions:', error);
+    }
+}
+function updateMarketStatus(data) {
+    document.getElementById('statusText').textContent = data.status || 'Unknown';
+    document.getElementById('endDate').textContent = data.end_date || '-';
+    if (data.resolved_outcome) {
+        document.getElementById('resolutionInfo').style.display = 'block';
+        document.getElementById('resolutionOutcome').textContent = data.resolved_outcome;
+        document.getElementById('resolutionDate').textContent = data.resolved_at || '-';
+    }
+}
+// Preview what would happen with resolution
+async function previewResolution(outcome) {
+    try {
+        const response = await fetch(`/api/markets/${marketId}/resolution-preview`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ outcome: outcome })
+        });
+        const data = await response.json();
+        if (data.success) {
+            showPreviewResults(data);
+        } else {
+            alert(`Error: ${data.error}`);
+        }
+    } catch (error) {
+        alert(`Network error: ${error.message}`);
+    }
+}
+function showPreviewResults(data) {
+    const previewDiv = document.getElementById('previewResults');
+    const contentDiv = document.getElementById('previewContent');
+    let html = `
+        <p><strong>Market:</strong> ${data.market_title}</p>
+        <p><strong>Outcome:</strong> <span class="nes-text ${data.outcome === 'YES' ? 'is-success' : 'is-error'}">${data.outcome}</span></p>
+        <p><strong>Total Payout:</strong> $${data.total_payout.toFixed(2)}</p>
+        <p><strong>Affected Users:</strong> ${data.affected_users}</p>
+        <hr>
+    `;
+    if (data.preview_results.length > 0) {
+        html += '<h5>Payout Breakdown:</h5>';
+        data.preview_results.forEach(result => {
+            html += `
+                <div class="payout-item">
+                    <span>${result.username}</span>
+                    <span>$${result.payout.toFixed(2)} (${result.winning_shares} shares)</span>
+                </div>
+            `;
+        });
+    } else {
+        html += '<p>No users would receive payouts.</p>';
+    }
+    contentDiv.innerHTML = html;
+    previewDiv.style.display = 'block';
+}
+// Actually resolve the market
+async function resolveMarket(outcome) {
+    if (!confirm(`Are you sure you want to resolve this market as ${outcome}? This cannot be undone!`)) {
+        return;
+    }
+    try {
+        const response = await fetch(`/api/markets/${marketId}/resolve`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ outcome: outcome })
+        });
+        const data = await response.json();
+        if (data.success) {
+            showResolutionSuccess(data);
+            // Disable further resolution
+            document.getElementById('resolveYesBtn').disabled = true;
+            document.getElementById('resolveNoBtn').disabled = true;
+            document.getElementById('statusText').textContent = 'Resolved';
+            // Update market status
+            document.getElementById('resolutionInfo').style.display = 'block';
+            document.getElementById('resolutionOutcome').textContent = outcome;
+            document.getElementById('resolutionDate').textContent = new Date().toLocaleString();
+        } else {
+            alert(`Error: ${data.error}`);
+        }
+    } catch (error) {
+        alert(`Network error: ${error.message}`);
+    }
+}
+function showResolutionSuccess(data) {
+    const successHtml = `
+        <div class="resolution-success">
+            <h4>✅ Market Resolved Successfully!</h4>
+            <p><strong>Outcome:</strong> ${data.outcome}</p>
+            <p><strong>Total Payout:</strong> $${data.total_payout.toFixed(2)}</p>
+            <p><strong>Users Affected:</strong> ${data.affected_users}</p>
+            <p>${data.message}</p>
+        </div>
+    `;
+    document.getElementById('resolutionStatus').innerHTML = successHtml;
+}
+// Check permissions when page loads
+if (document.getElementById('resolutionPanel')) {
+    document.addEventListener('DOMContentLoaded', function() {
+        checkResolutionPermissions();
+    });
+}
+</script>
+{% endblock %}

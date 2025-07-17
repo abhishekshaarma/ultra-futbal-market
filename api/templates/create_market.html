@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% block title %}Create Market{% endblock %}
+{% block content %}
+<div class="nes-container with-title">
+  <p class="title">Create New Market</p>
+  <form id="createMarketForm">
+    <div class="nes-field" style="margin-bottom: 15px;">
+      <label for="marketTitle">Market Question</label>
+      <input type="text" id="marketTitle" class="nes-input" placeholder="Will it rain tomorrow?" required>
+    </div>
+    <div class="nes-field" style="margin-bottom: 15px;">
+      <label for="marketDescription">Description</label>
+      <textarea id="marketDescription" class="nes-textarea" placeholder="Detailed description of the market conditions..."></textarea>
+    </div>
+    <div class="nes-field" style="margin-bottom: 15px;">
+      <label for="marketCategory">Category</label>
+      <div class="nes-select">
+        <select id="marketCategory">
+          <option value="weather">Weather</option>
+          <option value="sports">Sports</option>
+          <option value="politics">Politics</option>
+          <option value="crypto">Crypto</option>
+          <option value="general">General</option>
+        </select>
+      </div>
+    </div>
+    <div class="nes-field" style="margin-bottom: 15px;">
+      <label for="endDate">End Date & Time</label>
+      <input type="datetime-local" id="endDate" class="nes-input" required>
+    </div>
+    <button type="submit" class="nes-btn is-primary" style="width: 100%;">Create Market</button>
+  </form>
+</div>
+<script>
+document.getElementById('createMarketForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const formData = {
+        title: document.getElementById('marketTitle').value,
+        description: document.getElementById('marketDescription').value,
+        category: document.getElementById('marketCategory').value,
+        end_date: document.getElementById('endDate').value
+    };
+    try {
+        const response = await fetch('/api/markets', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(formData)
+        });
+        const result = await response.json();
+        if (result.success) {
+            alert('Market created successfully!');
+            window.location.href = `/markets/${result.market.id}`;
+        } else {
+            alert(`Error: ${result.error}`);
+        }
+    } catch (error) {
+        alert(`Network error: ${error.message}`);
+    }
+});
+</script>
+{% endblock %} 
