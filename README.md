@@ -25,7 +25,11 @@ A serverless Flask web app for trading in prediction markets. Built with Supabas
 graph TD
   A[UserBrowser] --> B[FlaskApp]
   B --> C[SupabaseDB]
+<<<<<<< Updated upstream
   D[OrderbookCPP] --> B
+=======
+  D[OrderbookCPP] --> B 
+>>>>>>> Stashed changes
   B --> E[Jinja2Static]
   B --> F[SupabaseAuth]
 
