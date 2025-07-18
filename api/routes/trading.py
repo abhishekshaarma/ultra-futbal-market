@@ -22,12 +22,86 @@ def get_current_user_id():
         print(f"DEBUG: Converting current_user to string: {str(current_user)}")
         return str(current_user)
 
+def ensure_user_profile_exists(user_id, email=None, supabase_client=None):
+    """
+    Ensure a user profile exists in the users table.
+    Creates one if it doesn't exist.
+    """
+    if not supabase_client:
+        supabase_client = app.supabase
+    
+    try:
+        # Check if user profile already exists
+        user_resp = supabase_client.table('users').select('*').eq('id', user_id).execute()
+        
+        if user_resp.data and len(user_resp.data) > 0:
+            # User exists, return the profile
+            return user_resp.data[0]
+        
+        # User doesn't exist, create profile
+        print(f"Creating user profile for {user_id}")
+        
+        # Generate username from email or user_id
+        if email:
+            username = email.split('@')[0]
+        else:
+            # Try to get email from auth.users
+            try:
+                auth_user = supabase_client.table('auth.users').select('email').eq('id', user_id).single().execute()
+                if auth_user.data and auth_user.data.get('email'):
+                    username = auth_user.data['email'].split('@')[0]
+                else:
+                    username = f'user_{user_id[:8]}'
+            except:
+                username = f'user_{user_id[:8]}'
+        
+        # Create the user profile
+        profile_data = {
+            'id': user_id,
+            'username': username,
+            'display_name': username,
+            'balance': 1000.00,
+            'total_volume': 0.0,
+            'is_admin': False,
+            'created_at': datetime.now(timezone.utc).isoformat()
+        }
+        
+        insert_resp = supabase_client.table('users').insert(profile_data).execute()
+        
+        if insert_resp.data:
+            print(f"Successfully created user profile for {user_id}")
+            return insert_resp.data[0]
+        else:
+            print(f"Failed to create user profile for {user_id}")
+            return None
+            
+    except Exception as e:
+        print(f"Error ensuring user profile exists: {e}")
+        return None
+
 def create_default_user_profile(user_id, supabase):
     """Create a default user profile with starting balance"""
     try:
-        # For now, just return success and let user manually create profile
-        # This avoids RLS policy issues
-        print(f"User profile creation skipped for {user_id} - please create manually in database")
+        # Get user info from auth
+        user = getattr(g, 'current_user', None)
+        user_email = getattr(user, 'email', None)
+        username = user_email.split('@')[0] if user_email else f'user_{str(user_id)[:8]}'
+        
+        # Use admin client to bypass RLS
+        admin_client = getattr(app, 'supabase_admin', supabase)
+        
+        # Create user profile
+        user_data = {
+            'id': user_id,  # Changed back to 'id'
+            'username': username,
+            'display_name': username,
+            'balance': 1000.00,
+            'total_volume': 0.0,
+            'created_at': datetime.now(timezone.utc).isoformat()
+        }
+        
+        result = admin_client.table('users').upsert(user_data).execute()
+        print(f"Successfully created user profile for {user_id}")
         return True
     except Exception as e:
         print(f"Failed to create user profile: {e}")
@@ -228,18 +302,40 @@ def place_order(market_id):
         if side == 'buy' and remaining_size > 0:
             remaining_cost = price * remaining_size if token == 'YES' else (1 - price) * remaining_size
             print(f"DEBUG: Deducting {remaining_cost} from user balance")
-            deduct_user_balance(user_id, remaining_cost, supabase)
+            
+            # Use admin client for balance deduction and transaction recording
+            admin_client = getattr(app, 'supabase_admin', supabase)
+            
+            try:
+                # Deduct from balance
+                user_resp = admin_client.table('users').select('balance').eq('id', user_id).single().execute()
+                if user_resp.data:
+                    current_balance = float(user_resp.data['balance'])
+                    new_balance = current_balance - remaining_cost
+                    
+                    admin_client.table('users').update({
+                        'balance': new_balance
+                    }).eq('id', user_id).execute()
+                    print(f"DEBUG: Updated user balance from {current_balance} to {new_balance}")
+                else:
+                    print(f"DEBUG: User not found for balance update")
+            except Exception as e:
+                print(f"Error deducting user balance: {e}")
             
             # Record transaction
-            supabase.table('transactions').insert({
-                'user_id': user_id,
-                'amount': -remaining_cost,
-                'type': 'order_placed',
-                'description': f'Placed {side} order for {remaining_size} {token} shares',
-                'market_id': market_id,
-                'order_id': order_id,
-                'created_at': datetime.now(timezone.utc).isoformat()
-            }).execute()
+            try:
+                admin_client.table('transactions').insert({
+                    'user_id': user_id,
+                    'amount': -remaining_cost,
+                    'type': 'order_placed',
+                    'description': f'Placed {side} order for {remaining_size} {token} shares',
+                    'market_id': market_id,
+                    'order_id': order_id,
+                    'created_at': datetime.now(timezone.utc).isoformat()
+                }).execute()
+                print(f"DEBUG: Transaction recorded successfully")
+            except Exception as e:
+                print(f"Error recording transaction: {e}")
         
         return jsonify({
             'success': True,
@@ -383,15 +479,19 @@ def cancel_order(market_id, order_id):
                     }).eq('id', user_id).execute()
                     
                     # Record refund transaction
-                    supabase.table('transactions').insert({
-                        'user_id': user_id,
-                        'amount': refund_amount,
-                        'type': 'order_cancelled',
-                        'description': f'Order cancellation refund',
-                        'market_id': market_id,
-                        'order_id': order_id,
-                        'created_at': datetime.now(timezone.utc).isoformat()
-                    }).execute()
+                    admin_client = getattr(app, 'supabase_admin', supabase)
+                    try:
+                        admin_client.table('transactions').insert({
+                            'user_id': user_id,
+                            'amount': refund_amount,
+                            'type': 'order_cancelled',
+                            'description': f'Order cancellation refund',
+                            'market_id': market_id,
+                            'order_id': order_id,
+                            'created_at': datetime.now(timezone.utc).isoformat()
+                        }).execute()
+                    except Exception as e:
+                        print(f"Error recording refund transaction: {e}")
         
         return jsonify({
             'success': True,
@@ -502,7 +602,7 @@ def get_user_balance():
             
             # Insert default user profile
             admin_client.table('users').insert({
-                'id': user_id,
+                'id': user_id,  # Changed back to 'id'
                 'username': username,
                 'display_name': username,
                 'balance': 1000.00,  # Starting balance
@@ -581,7 +681,7 @@ def add_sample_orders():
         
         # Create test user with balance
         supabase.table('users').upsert({
-            'id': TEST_USER_ID,
+            'id': TEST_USER_ID,  # Changed back to 'id'
             'username': f'testuser_{TEST_USER_ID[:8]}',
             'balance': 10000.0,
             'created_at': datetime.utcnow().isoformat()
@@ -811,10 +911,9 @@ def debug_create_user_profile():
         
         # Create user profile
         user_data = {
-            'id': current_user_id,
+            'id': current_user_id,  # Changed back to 'id'
             'username': username,
             'display_name': username,
-            'email': user_email,
             'balance': 1000.00,
             'total_volume': 0.0,
             'created_at': datetime.now(timezone.utc).isoformat()

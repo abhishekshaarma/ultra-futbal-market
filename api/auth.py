@@ -5,11 +5,22 @@ from flask import current_app as app
 auth_bp = Blueprint('auth', __name__)
 
 def is_admin(user_id):
+    """Check if user is admin by looking up in users table"""
     try:
         user_resp = app.supabase.table('users').select('is_admin').eq('id', user_id).single().execute()
         return user_resp.data and user_resp.data.get('is_admin', False)
     except Exception:
         return False
+
+def get_current_user_id():
+    """Helper function to extract user ID from g.current_user"""
+    current_user = g.current_user
+    if hasattr(current_user, 'id'):
+        return current_user.id
+    elif isinstance(current_user, dict):
+        return current_user['id']
+    else:
+        return str(current_user)
 
 def login_required(f):
     @wraps(f)
@@ -33,7 +44,11 @@ def login_required(f):
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not hasattr(g, 'current_user') or not is_admin(g.current_user.id):
+        if not hasattr(g, 'current_user'):
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        user_id = get_current_user_id()
+        if not is_admin(user_id):
             return jsonify({'error': 'Admin privileges required'}), 403
         return f(*args, **kwargs)
     return decorated_function

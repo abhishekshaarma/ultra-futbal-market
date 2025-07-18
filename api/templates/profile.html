@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% block title %}Dashboard{% endblock %}
+
 {% block content %}
 <a href="/logout" class="nes-btn is-error float-end" style="float:right;">Logout</a>
 <h1 class="nes-text is-primary">Welcome, {{ user.username or user.email }}</h1>

@@ -382,26 +382,29 @@ async function previewResolution(outcome) {
 function showPreviewResults(data) {
     const previewDiv = document.getElementById('previewResults');
     const contentDiv = document.getElementById('previewContent');
+    const preview = data.preview;
+    
     let html = `
-        <p><strong>Market:</strong> ${data.market_title}</p>
-        <p><strong>Outcome:</strong> <span class="nes-text ${data.outcome === 'YES' ? 'is-success' : 'is-error'}">${data.outcome}</span></p>
-        <p><strong>Total Payout:</strong> $${data.total_payout.toFixed(2)}</p>
-        <p><strong>Affected Users:</strong> ${data.affected_users}</p>
+        <p><strong>Total Payout:</strong> $${preview.total_payout.toFixed(2)}</p>
+        <p><strong>Winners:</strong> ${preview.winner_count} users</p>
+        <p><strong>Losers:</strong> ${preview.loser_count} users</p>
         <hr>
     `;
-    if (data.preview_results.length > 0) {
+    
+    if (preview.user_payouts.length > 0) {
         html += '<h5>Payout Breakdown:</h5>';
-        data.preview_results.forEach(result => {
+        preview.user_payouts.forEach(payout => {
             html += `
                 <div class="payout-item">
-                    <span>${result.username}</span>
-                    <span>$${result.payout.toFixed(2)} (${result.winning_shares} shares)</span>
+                    <span>User ${payout.user_id.substring(0, 8)}...</span>
+                    <span>$${payout.payout.toFixed(2)} (${payout.winning_shares} winning shares)</span>
                 </div>
             `;
         });
     } else {
         html += '<p>No users would receive payouts.</p>';
     }
+    
     contentDiv.innerHTML = html;
     previewDiv.style.display = 'block';
 }
@@ -440,9 +443,7 @@ function showResolutionSuccess(data) {
     const successHtml = `
         <div class="resolution-success">
             <h4>✅ Market Resolved Successfully!</h4>
-            <p><strong>Outcome:</strong> ${data.outcome}</p>
-            <p><strong>Total Payout:</strong> $${data.total_payout.toFixed(2)}</p>
-            <p><strong>Users Affected:</strong> ${data.affected_users}</p>
+            <p><strong>Outcome:</strong> ${data.message}</p>
             <p>${data.message}</p>
         </div>
     `;

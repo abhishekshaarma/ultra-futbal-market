@@ -291,11 +291,10 @@ def can_resolve_market(market_id):
         
         # Extract user info safely
         user_id = get_current_user_id()
-        is_admin = False
-        if hasattr(current_user, 'is_admin'):
-            is_admin = current_user.is_admin
-        elif isinstance(current_user, dict):
-            is_admin = current_user.get('is_admin', False)
+        
+        # Check if user is admin using the proper function
+        from api.auth import is_admin
+        is_admin_user = is_admin(user_id)
         
         # Check various conditions
         can_resolve = False
@@ -303,7 +302,7 @@ def can_resolve_market(market_id):
         
         if market['status'] != 'active':
             reason = "Market is not active"
-        elif current_user.get('is_admin', False):
+        elif is_admin_user:
             # Admins can always resolve
             can_resolve = True
         else:
@@ -319,7 +318,7 @@ def can_resolve_market(market_id):
             'reason': reason,
             'market_status': market['status'],
             'market_ended': market_ended,
-            'is_admin': current_user.get('is_admin', False)
+            'is_admin': is_admin_user
         })
         
     except Exception as e:

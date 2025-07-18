@@ -1,101 +1,64 @@
-{% extends "base.html" %}
-
-{% block title %}Debug Tools{% endblock %}
+{% extends 'base.html' %}
+{% block title %}Debug Page{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <h1>Debug Tools</h1>
-    
-    <div class="row">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5>User Management</h5>
-                </div>
-                <div class="card-body">
-                    <button id="checkUsers" class="btn btn-info mb-2">Check All Users</button>
-                    <button id="createProfile" class="btn btn-success mb-2">Create My Profile</button>
-                    <button id="checkBalance" class="btn btn-warning mb-2">Check My Balance</button>
-                    
-                    <div id="userResults" class="mt-3">
-                        <pre id="userOutput" class="bg-light p-2 rounded" style="max-height: 300px; overflow-y: auto;"></pre>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5>Database Info</h5>
-                </div>
-                <div class="card-body">
-                    <button id="checkMarkets" class="btn btn-primary mb-2">Check Markets</button>
-                    <button id="checkOrders" class="btn btn-secondary mb-2">Check Orders</button>
-                    
-                    <div id="dbResults" class="mt-3">
-                        <pre id="dbOutput" class="bg-light p-2 rounded" style="max-height: 300px; overflow-y: auto;"></pre>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+<div class="nes-container with-title">
+  <p class="title">Debug Tools</p>
+  
+  <div class="nes-container">
+    <h3>User Profile Management</h3>
+    <button class="nes-btn" onclick="createUserProfile()">Create My Profile</button>
+    <div id="debugResults"></div>
+  </div>
+
+  <div class="nes-container">
+    <h3>Database Debug</h3>
+    <button class="nes-btn" onclick="checkUsers()">Check Users in DB</button>
+    <button class="nes-btn" onclick="checkMarkets()">Check Markets</button>
+    <div id="dbResults"></div>
+  </div>
 </div>
 
 <script>
-document.getElementById('checkUsers').addEventListener('click', async () => {
-    try {
-        const response = await fetch('/api/debug/all-users');
-        const data = await response.json();
-        document.getElementById('userOutput').textContent = JSON.stringify(data, null, 2);
-    } catch (error) {
-        document.getElementById('userOutput').textContent = 'Error: ' + error.message;
-    }
-});
-
-document.getElementById('createProfile').addEventListener('click', async () => {
+async function createUserProfile() {
     try {
         const response = await fetch('/api/debug/create-user-profile', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
             }
         });
         const data = await response.json();
-        document.getElementById('userOutput').textContent = JSON.stringify(data, null, 2);
+        document.getElementById('debugResults').innerHTML = 
+            `<pre>${JSON.stringify(data, null, 2)}</pre>`;
     } catch (error) {
-        document.getElementById('userOutput').textContent = 'Error: ' + error.message;
+        document.getElementById('debugResults').innerHTML = 
+            `<p class="nes-text is-error">Error: ${error.message}</p>`;
     }
-});
+}
 
-document.getElementById('checkBalance').addEventListener('click', async () => {
+async function checkUsers() {
     try {
-        const response = await fetch('/api/user/balance');
+        const response = await fetch('/api/debug/users');
         const data = await response.json();
-        document.getElementById('userOutput').textContent = JSON.stringify(data, null, 2);
+        document.getElementById('dbResults').innerHTML = 
+            `<pre>${JSON.stringify(data, null, 2)}</pre>`;
     } catch (error) {
-        document.getElementById('userOutput').textContent = 'Error: ' + error.message;
+        document.getElementById('dbResults').innerHTML = 
+            `<p class="nes-text is-error">Error: ${error.message}</p>`;
     }
-});
+}
 
-document.getElementById('checkMarkets').addEventListener('click', async () => {
+async function checkMarkets() {
     try {
         const response = await fetch('/api/markets');
         const data = await response.json();
-        document.getElementById('dbOutput').textContent = JSON.stringify(data, null, 2);
+        document.getElementById('dbResults').innerHTML = 
+            `<pre>${JSON.stringify(data, null, 2)}</pre>`;
     } catch (error) {
-        document.getElementById('dbOutput').textContent = 'Error: ' + error.message;
+        document.getElementById('dbResults').innerHTML = 
+            `<p class="nes-text is-error">Error: ${error.message}</p>`;
     }
-});
-
-document.getElementById('checkOrders').addEventListener('click', async () => {
-    try {
-        const response = await fetch('/api/user/orders');
-        const data = await response.json();
-        document.getElementById('dbOutput').textContent = JSON.stringify(data, null, 2);
-    } catch (error) {
-        document.getElementById('dbOutput').textContent = 'Error: ' + error.message;
-    }
-});
+}
 </script>
 {% endblock %} 

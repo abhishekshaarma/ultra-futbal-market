@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, render_template, g, current_app, redirect, url_for, make_response, flash
-from api.auth import login_required
+from api.auth import login_required, get_current_user_id
 from datetime import datetime, timezone
 
 def get_user_dict(user_obj):
@@ -67,7 +67,7 @@ def profile():
             if not getattr(profile_resp, 'data', None):
                 # Try to create the user row if missing
                 supabase.table('users').insert({
-                    'id': user_id,
+                    'id': user_id,  # Changed back to 'id'
                     'username': username,
                     'display_name': username,
                 }).execute()
@@ -174,7 +174,7 @@ def signup():
                 admin_client = getattr(current_app, 'supabase_admin', current_app.supabase)
                 
                 admin_client.table('users').upsert({
-                    'id': user_id,
+                    'id': user_id,  # Changed back to 'id'
                     'username': username,
                     'display_name': username,
                     'balance': 1000.00,  # Starting balance
@@ -189,7 +189,7 @@ def signup():
                 try:
                     admin_client = getattr(current_app, 'supabase_admin', current_app.supabase)
                     admin_client.table('users').upsert({
-                        'id': user_id,
+                        'id': user_id,  # Changed back to 'id'
                         'username': username,
                         'balance': 1000.00
                     }).execute()
@@ -312,3 +312,5 @@ def logout():
     resp = make_response(redirect(url_for('user.login')))
     resp.set_cookie('access_token', '', expires=0, httponly=True)
     return resp 
+
+ 
