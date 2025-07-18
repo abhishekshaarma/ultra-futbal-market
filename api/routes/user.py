@@ -40,11 +40,6 @@ def home():
 def about():
     return render_template('about.html')
 
-@user_bp.route('/debug')
-@login_required
-def debug():
-    return render_template('debug.html')
-
 @user_bp.route('/profile')
 @login_required
 def profile():
