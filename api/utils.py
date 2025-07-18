@@ -3,6 +3,7 @@ import sys
 from flask import current_app
 from datetime import datetime, timezone
 import uuid
+from supabase import create_client, Client
 
 # Add orderbook folder to Python path
 orderbook_path = os.path.join(os.path.dirname(__file__), 'orderbook')
@@ -264,3 +265,51 @@ def match_orders_database_only(market_id, new_order, supabase):
     except Exception as e:
         print(f"Error in database-only order matching: {e}")
         return [], new_order['size']
+
+def ensure_user_profile_exists(user_id, supabase_client):
+    """Ensure a user profile exists in the database, create if missing"""
+    try:
+        # Try to get existing user
+        user_resp = supabase_client.table('users').select('*').eq('id', user_id).execute()
+        
+        if user_resp.data and len(user_resp.data) > 0:
+            # User exists, return the profile
+            return user_resp.data[0]
+        
+        # User doesn't exist, create default profile
+        print(f"Creating default user profile for {user_id}")
+        
+        # Try to get user email from auth if possible
+        user_email = ""
+        try:
+            # This might not work in all contexts, so we handle the error
+            from flask import request, current_app
+            user_info = current_app.supabase.auth.get_user(request.cookies.get('access_token'))
+            user_email = getattr(user_info, 'user', {}).get('email', '')
+        except:
+            pass
+        
+        username = user_email.split('@')[0] if user_email else f'user_{user_id[:8]}'
+        
+        # Create default profile
+        profile_data = {
+            'id': user_id,
+            'username': username,
+            'display_name': username,
+            'balance': 1000.00,  # Starting balance
+            'total_volume': 0.0,
+            'created_at': datetime.now(timezone.utc).isoformat()
+        }
+        
+        insert_resp = supabase_client.table('users').upsert(profile_data).execute()
+        
+        if insert_resp.data:
+            print(f"Successfully created user profile for {user_id}")
+            return insert_resp.data[0]
+        else:
+            print(f"Failed to create user profile for {user_id}")
+            return None
+            
+    except Exception as e:
+        print(f"Error ensuring user profile exists: {e}")
+        return None

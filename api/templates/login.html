@@ -3,8 +3,11 @@
 {% block content %}
 <div class="nes-container with-title is-centered is-rounded" style="max-width: 400px; margin: 3em auto;">
   <p class="title" style="background-color: #333333">Login</p>
+  {% if message %}
+    <div class="nes-container is-rounded" style="background:#edffed;color:#0a0;margin-bottom:1em;">{{ message }}</div>
+  {% endif %}
   {% if error %}
-    <div class="nes-container is-rounded is-dark" style="background:#ffeded;color:#a00;">{{ error }}</div>
+    <div class="nes-container is-rounded is-dark" style="background:#ffeded;color:#a00;margin-bottom:1em;">{{ error }}</div>
   {% endif %}
   <form method="post" action="/login">
     <div class="nes-field mb-3">

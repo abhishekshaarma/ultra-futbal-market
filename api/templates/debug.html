@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Debug Tools{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Debug Tools</h1>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>User Management</h5>
+                </div>
+                <div class="card-body">
+                    <button id="checkUsers" class="btn btn-info mb-2">Check All Users</button>
+                    <button id="createProfile" class="btn btn-success mb-2">Create My Profile</button>
+                    <button id="checkBalance" class="btn btn-warning mb-2">Check My Balance</button>
+                    
+                    <div id="userResults" class="mt-3">
+                        <pre id="userOutput" class="bg-light p-2 rounded" style="max-height: 300px; overflow-y: auto;"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Database Info</h5>
+                </div>
+                <div class="card-body">
+                    <button id="checkMarkets" class="btn btn-primary mb-2">Check Markets</button>
+                    <button id="checkOrders" class="btn btn-secondary mb-2">Check Orders</button>
+                    
+                    <div id="dbResults" class="mt-3">
+                        <pre id="dbOutput" class="bg-light p-2 rounded" style="max-height: 300px; overflow-y: auto;"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('checkUsers').addEventListener('click', async () => {
+    try {
+        const response = await fetch('/api/debug/all-users');
+        const data = await response.json();
+        document.getElementById('userOutput').textContent = JSON.stringify(data, null, 2);
+    } catch (error) {
+        document.getElementById('userOutput').textContent = 'Error: ' + error.message;
+    }
+});
+
+document.getElementById('createProfile').addEventListener('click', async () => {
+    try {
+        const response = await fetch('/api/debug/create-user-profile', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        const data = await response.json();
+        document.getElementById('userOutput').textContent = JSON.stringify(data, null, 2);
+    } catch (error) {
+        document.getElementById('userOutput').textContent = 'Error: ' + error.message;
+    }
+});
+
+document.getElementById('checkBalance').addEventListener('click', async () => {
+    try {
+        const response = await fetch('/api/user/balance');
+        const data = await response.json();
+        document.getElementById('userOutput').textContent = JSON.stringify(data, null, 2);
+    } catch (error) {
+        document.getElementById('userOutput').textContent = 'Error: ' + error.message;
+    }
+});
+
+document.getElementById('checkMarkets').addEventListener('click', async () => {
+    try {
+        const response = await fetch('/api/markets');
+        const data = await response.json();
+        document.getElementById('dbOutput').textContent = JSON.stringify(data, null, 2);
+    } catch (error) {
+        document.getElementById('dbOutput').textContent = 'Error: ' + error.message;
+    }
+});
+
+document.getElementById('checkOrders').addEventListener('click', async () => {
+    try {
+        const response = await fetch('/api/user/orders');
+        const data = await response.json();
+        document.getElementById('dbOutput').textContent = JSON.stringify(data, null, 2);
+    } catch (error) {
+        document.getElementById('dbOutput').textContent = 'Error: ' + error.message;
+    }
+});
+</script>
+{% endblock %} 

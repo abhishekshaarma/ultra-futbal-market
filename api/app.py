@@ -17,9 +17,19 @@ def create_app():
     # Supabase client
     SUPABASE_URL = os.getenv('SUPABASE_URL')
     SUPABASE_KEY = os.getenv('SUPABASE_API_KEY')
+    SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY')  # Service role key for admin operations
+    
     if not SUPABASE_URL or not SUPABASE_KEY:
         raise RuntimeError('SUPABASE_URL and SUPABASE_KEY must be set in environment variables')
+    
     setattr(app, "supabase", create_client(SUPABASE_URL, SUPABASE_KEY))
+    
+    # Service role client for admin operations (bypasses RLS)
+    if SUPABASE_SERVICE_KEY:
+        setattr(app, "supabase_admin", create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY))
+    else:
+        # Fallback to regular client if service key not available
+        setattr(app, "supabase_admin", create_client(SUPABASE_URL, SUPABASE_KEY))
 
     # Orderbook markets dict (in-memory)
     setattr(app, "markets", {})

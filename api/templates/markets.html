@@ -1,88 +1,332 @@
 {% extends 'base.html' %}
-{% block title %}Markets{% endblock %}
+
+{% block title %}Markets - ULTRAX{% endblock %}
+
+{% block header_title %}🎯 Prediction Markets{% endblock %}
+
+{% block header_subtitle %}Trade on the outcome of future events!{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stats {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+    }
+    
+    .stat-box {
+        background: #333333;
+        border: 2px solid #39FF14;
+        padding: 1rem;
+        text-align: center;
+        min-width: 150px;
+    }
+    
+    .stat-number {
+        color: #39FF14;
+        font-size: 1rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .stat-label {
+        color: #FFFFFF;
+        font-size: 0.5rem;
+    }
+    
+    .markets-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    }
+    
+    .market-card {
+        background: #333333;
+        border: 2px solid #39FF14;
+        padding: 1rem;
+    }
+    
+    .market-title {
+        color: #39FF14;
+        font-size: 0.7rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .market-description {
+        color: #FFFFFF;
+        font-size: 0.5rem;
+        margin-bottom: 1rem;
+        opacity: 0.8;
+    }
+    
+    .market-stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .stat-item {
+        text-align: center;
+        padding: 0.3rem;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid #39FF14;
+    }
+    
+    .stat-value {
+        color: #FF3CAC;
+        font-size: 0.6rem;
+        margin-bottom: 0.2rem;
+    }
+    
+    .stat-title {
+        color: #FFFFFF;
+        font-size: 0.4rem;
+    }
+    
+    .price-tokens {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .token {
+        padding: 0.5rem;
+        text-align: center;
+        border: 2px solid;
+    }
+    
+    .token-yes {
+        background: #39FF14;
+        color: #333333;
+        border-color: #39FF14;
+    }
+    
+    .token-no {
+        background: #FF3CAC;
+        color: #333333;
+        border-color: #FF3CAC;
+    }
+    
+    .token-label {
+        font-size: 0.5rem;
+        margin-bottom: 0.3rem;
+    }
+    
+    .token-price {
+        font-size: 0.6rem;
+    }
+    
+    .btn-trade {
+        width: 100%;
+        background: #FF3CAC;
+        color: #333333;
+        border: 2px solid #FF3CAC;
+        padding: 0.5rem;
+        font-size: 0.5rem;
+        cursor: pointer;
+        font-family: inherit;
+    }
+    
+    .btn-trade:hover {
+        background: #39FF14;
+        border-color: #39FF14;
+    }
+    
+    .loading {
+        text-align: center;
+        padding: 2rem;
+        color: #39FF14;
+    }
+    
+    @media (max-width: 768px) {
+        .stats {
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .markets-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="nes-container with-title is-centered is-rounded" style="margin-top:2em; background: var(--clr-surface); border-color: var(--clr-primary);">
-  <p class="title nes-text is-primary">Prediction Markets</p>
-  <div class="markets-table" style="width:100%;">
-    <div class="table-header" style="display:flex; background: #181818; color: var(--clr-primary); font-weight:bold;">
-      <div class="nes-text is-primary" style="flex:2.5; text-align:center;">Market</div>
-      <div class="nes-text is-primary" style="flex:1; text-align:center;">Activity</div>
-      <div class="nes-text is-primary" style="flex:1; text-align:center;">Best Bid</div>
-      <div class="nes-text is-primary" style="flex:1; text-align:center;">Best Ask</div>
-      <div class="nes-text is-primary" style="flex:1; text-align:center;">Action</div>
+<!-- Stats -->
+<div class="stats">
+    <div class="stat-box">
+        <div class="stat-number" id="total-markets">0</div>
+        <div class="stat-label">MARKETS</div>
     </div>
-    {% for market in markets %}
-    <div class="market-row nes-container is-dark is-rounded" data-market-id="{{ market.id }}" style="display:flex; align-items:center; margin-bottom:1em; background:#23272e; border: 1.5px solid var(--clr-primary);">
-      <div class="market-info" style="flex:2.5;">
-        <h3 class="nes-text is-primary" style="margin-bottom:0.3em;">{{ market.title }}</h3>
-        <p class="nes-text" style="color:#bdbdbd;">{{ market.description }}</p>
-      </div>
-      <div class="market-activity" style="flex:1; justify-content:center; text-align:center;">
-        <span class="order-count nes-badge is-icon">-</span> <span class="nes-text">orders</span>
-      </div>
-      <div class="best-bid nes-badge is-success" style="flex:1; justify-content:center; text-align:center;">-</div>
-      <div class="best-ask nes-badge is-error" style="flex:1; justify-content:center; text-align:center;">-</div>
-      <div class="market-action" style="flex:1; justify-content:center; text-align:center;">
-        <a href="/markets/{{ market.id }}" class="nes-btn is-primary">View Market</a>
-      </div>
+    <div class="stat-box">
+        <div class="stat-number">$<span id="user-balance">1000.00</span></div>
+        <div class="stat-label">BALANCE</div>
     </div>
-    {% endfor %}
-  </div>
+    <div class="stat-box">
+        <div class="stat-number" id="total-volume">$0</div>
+        <div class="stat-label">VOLUME</div>
+    </div>
+</div>
+
+<!-- Markets -->
+<div id="loading" class="loading">🎮 Loading markets...</div>
+<div class="markets-grid" id="markets-container" style="display: none;">
+    <!-- Markets will be loaded here -->
 </div>
 {% endblock %}
+
 {% block scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    loadMarketOrderbooks();
-});
-async function loadMarketOrderbooks() {
-    const marketRows = document.querySelectorAll('[data-market-id]');
-    for (const row of marketRows) {
-        const marketId = row.getAttribute('data-market-id');
-        await loadOrderbookForMarket(marketId, row);
-    }
-}
-async function loadOrderbookForMarket(marketId, row) {
-    try {
-        const response = await fetch(`/api/markets/${marketId}/orderbook`);
-        const data = await response.json();
-        if (data.success) {
-            const orderbook = data.orderbook;
-            const totalOrders = 
-                orderbook.yes_token.bids.length + 
-                orderbook.yes_token.asks.length + 
-                orderbook.no_token.bids.length + 
-                orderbook.no_token.asks.length;
-            let bestBid = null;
-            const allBids = [...orderbook.yes_token.bids, ...orderbook.no_token.bids];
-            if (allBids.length > 0) {
-                bestBid = Math.max(...allBids.map(bid => bid.price));
+    document.addEventListener('DOMContentLoaded', function() {
+        loadUserBalance();
+        loadMarkets();
+    });
+
+    async function loadUserBalance() {
+        try {
+            const response = await fetch('/api/user/balance');
+            const data = await response.json();
+            if (data.success) {
+                document.getElementById('user-balance').textContent = data.balance.toFixed(2);
             }
-            let bestAsk = null;
-            const allAsks = [...orderbook.yes_token.asks, ...orderbook.no_token.asks];
-            if (allAsks.length > 0) {
-                bestAsk = Math.min(...allAsks.map(ask => ask.price));
-            }
-            updateMarketRow(row, totalOrders, bestBid, bestAsk);
+        } catch (error) {
+            console.error('Error loading balance:', error);
         }
-    } catch (error) {
-        console.error(`Error loading orderbook for market ${marketId}:`, error);
-        updateMarketRow(row, 0, null, null);
     }
-}
-function updateMarketRow(row, totalOrders, bestBid, bestAsk) {
-    const orderCountElement = row.querySelector('.order-count');
-    if (orderCountElement) {
-        orderCountElement.textContent = totalOrders;
+
+    async function loadMarkets() {
+        try {
+            const response = await fetch('/api/markets');
+            const data = await response.json();
+            
+            if (data.success && data.markets.length > 0) {
+                document.getElementById('total-markets').textContent = data.markets.length;
+                renderMarkets(data.markets);
+                loadAllOrderbooks();
+                
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('markets-container').style.display = 'grid';
+            } else {
+                document.getElementById('loading').innerHTML = '😭 No markets found';
+            }
+        } catch (error) {
+            console.error('Error loading markets:', error);
+            document.getElementById('loading').innerHTML = '❌ Error loading markets';
+        }
     }
-    const bestBidElement = row.querySelector('.best-bid');
-    if (bestBidElement) {
-        bestBidElement.textContent = bestBid ? `$${bestBid.toFixed(2)}` : 'no bids';
+
+    function renderMarkets(markets) {
+        const container = document.getElementById('markets-container');
+        
+        container.innerHTML = markets.map(market => `
+            <div class="market-card" data-market-id="${market.id}">
+                <div class="market-title">${escapeHtml(market.title)}</div>
+                <div class="market-description">${escapeHtml(market.description || '')}</div>
+                
+                <div class="market-stats">
+                    <div class="stat-item">
+                        <div class="stat-value order-count">0</div>
+                        <div class="stat-title">ORDERS</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value best-bid">-</div>
+                        <div class="stat-title">BEST BID</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value best-ask">-</div>
+                        <div class="stat-title">BEST ASK</div>
+                    </div>
+                </div>
+                
+                <div class="price-tokens">
+                    <div class="token token-yes">
+                        <div class="token-label">YES</div>
+                        <div class="token-price">$${(market.yes_price || 0.5).toFixed(2)}</div>
+                    </div>
+                    <div class="token token-no">
+                        <div class="token-label">NO</div>
+                        <div class="token-price">$${(market.no_price || 0.5).toFixed(2)}</div>
+                    </div>
+                </div>
+                
+                <button class="btn-trade" onclick="window.location.href='/markets/${market.id}'">
+                    🎯 TRADE NOW
+                </button>
+            </div>
+        `).join('');
     }
-    const bestAskElement = row.querySelector('.best-ask');
-    if (bestAskElement) {
-        bestAskElement.textContent = bestAsk ? `$${bestAsk.toFixed(2)}` : 'no asks';
+
+    async function loadAllOrderbooks() {
+        const marketCards = document.querySelectorAll('[data-market-id]');
+        
+        for (const card of marketCards) {
+            const marketId = card.getAttribute('data-market-id');
+            await loadOrderbookForMarket(marketId, card);
+        }
     }
-}
+
+    async function loadOrderbookForMarket(marketId, card) {
+        try {
+            const response = await fetch(`/api/markets/${marketId}/orderbook`);
+            const data = await response.json();
+            
+            if (data.success) {
+                const orderbook = data.orderbook;
+                
+                const totalOrders = 
+                    orderbook.yes_token.bids.length + 
+                    orderbook.yes_token.asks.length + 
+                    orderbook.no_token.bids.length + 
+                    orderbook.no_token.asks.length;
+                
+                let bestBid = null;
+                const allBids = [...orderbook.yes_token.bids, ...orderbook.no_token.bids];
+                if (allBids.length > 0) {
+                    bestBid = Math.max(...allBids.map(bid => bid.price));
+                }
+                
+                let bestAsk = null;
+                const allAsks = [...orderbook.yes_token.asks, ...orderbook.no_token.asks];
+                if (allAsks.length > 0) {
+                    bestAsk = Math.min(...allAsks.map(ask => ask.price));
+                }
+                
+                updateMarketCard(card, totalOrders, bestBid, bestAsk);
+            }
+        } catch (error) {
+            console.error(`Error loading orderbook for ${marketId}:`, error);
+        }
+    }
+
+    function updateMarketCard(card, totalOrders, bestBid, bestAsk) {
+        const orderCountElement = card.querySelector('.order-count');
+        if (orderCountElement) {
+            orderCountElement.textContent = totalOrders;
+        }
+        
+        const bestBidElement = card.querySelector('.best-bid');
+        if (bestBidElement) {
+            bestBidElement.textContent = bestBid ? `$${bestBid.toFixed(2)}` : 'no bids';
+        }
+        
+        const bestAskElement = card.querySelector('.best-ask');
+        if (bestAskElement) {
+            bestAskElement.textContent = bestAsk ? `$${bestAsk.toFixed(2)}` : 'no asks';
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Refresh every 30 seconds
+    setInterval(() => {
+        loadAllOrderbooks();
+    }, 30000);
 </script>
 {% endblock %}
